@@ -1,6 +1,6 @@
-# Vịt Nhỏ English 8
+# Vịt Nhỏ English 8 & 9
 
-Website luyện 6 đề giữa kỳ Tiếng Anh 8, mỗi đề 25 câu, có chế độ luyện tập và làm bài test.
+Website có hai tab English 8 và English 9. Hiện tại gồm 6 đề giữa kỳ lớp 8 và 1 đề khảo sát chất lượng đầu năm lớp 9; mỗi đề 25 câu, có chế độ luyện tập và làm bài test.
 
 ## Mở website trên GitHub Pages
 

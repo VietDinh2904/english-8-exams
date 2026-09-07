@@ -7,10 +7,12 @@ import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { exams } from '@/lib/exams';
+import { exams as exams8 } from '@/lib/exams';
+import { exams9 } from '@/lib/exams9';
 
 type Answers = Record<number, number>;
 type ExamMode = 'practice' | 'test';
+type GradeLevel = 8 | 9;
 type ModelContext = { registerTool: (tool: Record<string, unknown>, options?: { signal: AbortSignal }) => void | Promise<void> };
 
 function formatTime(seconds: number) {
@@ -27,6 +29,7 @@ function UnderlinedOption({ text, target }: { text: string; target?: string }) {
 }
 
 export default function Home() {
+  const [grade, setGrade] = useState<GradeLevel>(8);
   const [mode, setMode] = useState<ExamMode>('practice');
   const [examIndex, setExamIndex] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -34,7 +37,8 @@ export default function Home() {
   const [flagged, setFlagged] = useState<number[]>([]);
   const [secondsLeft, setSecondsLeft] = useState(60 * 60);
   const [submitted, setSubmitted] = useState(false);
-  const exam = exams[examIndex];
+  const availableExams = grade === 8 ? exams8 : exams9;
+  const exam = availableExams[examIndex];
   const question = exam.questions[questionIndex];
   const selected = answers[question.id];
   const isAnswered = selected !== undefined;
@@ -62,6 +66,16 @@ export default function Home() {
     setSecondsLeft(60 * 60);
   }, []);
 
+  const switchGrade = (nextGrade: GradeLevel) => {
+    setGrade(nextGrade);
+    setExamIndex(0);
+    setQuestionIndex(0);
+    setAnswers({});
+    setFlagged([]);
+    setSubmitted(false);
+    setSecondsLeft(60 * 60);
+  };
+
   const switchMode = (nextMode: ExamMode) => {
     setMode(nextMode);
     setQuestionIndex(0);
@@ -84,12 +98,12 @@ export default function Home() {
       void Promise.resolve(context.registerTool({
         name: 'select_exam',
         title: 'Chọn đề luyện tập',
-        description: 'Mở một trong sáu đề giữa kỳ Tiếng Anh 8 và đặt lại lượt làm bài.',
-        inputSchema: { type: 'object', properties: { examNumber: { type: 'integer', minimum: 1, maximum: 6 } }, required: ['examNumber'], additionalProperties: false },
+        description: `Mở một đề trong bộ Tiếng Anh ${grade} hiện tại và đặt lại lượt làm bài.`,
+        inputSchema: { type: 'object', properties: { examNumber: { type: 'integer', minimum: 1, maximum: availableExams.length } }, required: ['examNumber'], additionalProperties: false },
         annotations: { readOnlyHint: false, untrustedContentHint: false },
         execute(input: unknown) {
           const value = (input as { examNumber?: number }).examNumber;
-          if (!Number.isInteger(value) || !value || value < 1 || value > 6) throw new Error('examNumber must be an integer from 1 to 6');
+          if (!Number.isInteger(value) || !value || value < 1 || value > availableExams.length) throw new Error(`examNumber must be an integer from 1 to ${availableExams.length}`);
           selectExam(value - 1);
           return { examNumber: value, status: 'ready' };
         },
@@ -111,18 +125,18 @@ export default function Home() {
       }, { signal: lifecycle.signal })).catch(report);
     } catch { report(); }
     return () => lifecycle.abort();
-  }, [chooseAnswer, mode, question, selectExam]);
+  }, [availableExams.length, chooseAnswer, grade, mode, question, selectExam]);
 
   const resetExam = () => selectExam(examIndex);
   const toggleFlag = () => setFlagged((items) => items.includes(question.id) ? items.filter((id) => id !== question.id) : [...items, question.id]);
 
   const examMenu = (
     <div>
-      <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-sky-700">Bộ đề giữa kỳ</p>
+      <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-sky-700">{grade === 8 ? 'Bộ đề giữa kỳ' : 'Bộ đề lớp 9'}</p>
       <nav className="grid gap-2">
-        {exams.map((item, index) => (
+        {availableExams.map((item, index) => (
           <button key={item.id} onClick={() => selectExam(index)} className={`group rounded-2xl px-3 py-3 text-left transition ${index === examIndex ? 'bg-sky-600 text-white shadow-md shadow-sky-100' : 'bg-sky-50 text-[#15324a] hover:bg-sky-100'}`}>
-            <span className="block font-bold">Đề số {item.id}</span><span className={`mt-0.5 block text-xs ${index === examIndex ? 'text-sky-100' : 'text-slate-500'}`}>{item.theme}</span>
+            <span className="block font-bold">{grade === 8 ? `Đề số ${item.id}` : 'Khảo sát đầu năm'}</span><span className={`mt-0.5 block text-xs ${index === examIndex ? 'text-sky-100' : 'text-slate-500'}`}>{item.theme}</span>
           </button>
         ))}
       </nav>
@@ -134,10 +148,13 @@ export default function Home() {
       <header className="sticky top-0 z-30 border-b border-sky-100 bg-white/92 px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <img src="duck-learn.png" alt="Mascot vịt vàng đang học" className="h-12 w-12 object-contain" />
-            <div><strong className="block text-lg leading-tight">Vịt Nhỏ English 8</strong><span className="hidden text-sm text-slate-500 sm:block">Ôn giữa kỳ thật nhẹ nhàng</span></div>
+            <img src={grade === 8 ? 'duck-grade8-reading.png' : 'duck-grade9-explorer.png'} alt={`Mascot vịt vàng English ${grade}`} className="h-12 w-12 rounded-xl object-cover object-top" />
+            <div><strong className="block text-lg leading-tight">Vịt Nhỏ English {grade}</strong><span className="hidden text-sm text-slate-500 sm:block">{grade === 8 ? 'Ôn giữa kỳ thật nhẹ nhàng' : 'Vững nền tảng, tự tin vào lớp 9'}</span></div>
           </div>
-          <span className="hidden rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800 md:inline">Global Success · Unit 1–3</span>
+          <div className="flex rounded-2xl border border-sky-100 bg-sky-50 p-1" aria-label="Chọn khối lớp">
+            {([8, 9] as GradeLevel[]).map((item) => <button key={item} onClick={() => switchGrade(item)} className={`rounded-xl px-3 py-2 text-sm font-extrabold transition sm:px-5 ${grade === item ? 'bg-sky-600 text-white shadow-sm' : 'text-sky-800 hover:bg-white'}`} aria-pressed={grade === item}>English {item}</button>)}
+          </div>
+          <span className="hidden rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800 xl:inline">{grade === 8 ? 'Global Success · Unit 1–3' : 'Khảo sát đầu năm · 25 câu'}</span>
           <Sheet><SheetTrigger render={<Button variant="outline" size="icon" className="lg:hidden" aria-label="Mở danh sách đề" />}><Menu /></SheetTrigger><SheetContent side="left"><SheetTitle className="mb-5">Chọn đề</SheetTitle>{examMenu}</SheetContent></Sheet>
         </div>
       </header>
@@ -158,7 +175,7 @@ export default function Home() {
 
           {submitted ? (
             <article className="overflow-hidden rounded-[28px] border border-sky-100 bg-white text-center shadow-[0_16px_50px_rgba(24,95,140,.08)]">
-              <div className="bg-sky-600 px-6 py-8 text-white"><img src="duck-learn.png" alt="Vịt nhỏ chúc mừng" className="mx-auto h-32 w-32 object-contain drop-shadow-lg"/><p className="mt-2 text-sm font-bold uppercase tracking-[.18em] text-sky-100">Đã hoàn thành đề {exam.id}</p><h2 className="mt-2 text-4xl font-extrabold">{score}/{exam.questions.length} câu đúng</h2></div>
+              <div className="bg-sky-600 px-6 py-8 text-white"><img src="duck-celebrate.png" alt="Vịt nhỏ chúc mừng" className="mx-auto h-36 w-36 object-contain drop-shadow-lg"/><p className="mt-2 text-sm font-bold uppercase tracking-[.18em] text-sky-100">Đã hoàn thành English {grade} · Đề {exam.id}</p><h2 className="mt-2 text-4xl font-extrabold">{score}/{exam.questions.length} câu đúng</h2></div>
               <div className="p-7">
                 <p className="text-lg text-slate-600">{score >= 20 ? 'Xuất sắc! Vịt Nhỏ thấy bạn đã nắm bài rất chắc.' : score >= 15 ? 'Làm tốt lắm! Xem lại vài câu sai là bạn sẽ tiến bộ nhanh.' : 'Mình cùng xem lại đáp án rồi thử lần nữa nhé.'}</p>
                 <div className="mt-7 space-y-3 text-left">
