@@ -134,7 +134,7 @@ export default function Home() {
       <header className="sticky top-0 z-30 border-b border-sky-100 bg-white/92 px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <img src="/duck-learn.png" alt="Mascot vịt vàng đang học" className="h-12 w-12 object-contain" />
+            <img src="duck-learn.png" alt="Mascot vịt vàng đang học" className="h-12 w-12 object-contain" />
             <div><strong className="block text-lg leading-tight">Vịt Nhỏ English 8</strong><span className="hidden text-sm text-slate-500 sm:block">Ôn giữa kỳ thật nhẹ nhàng</span></div>
           </div>
           <span className="hidden rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800 md:inline">Global Success · Unit 1–3</span>
@@ -158,7 +158,7 @@ export default function Home() {
 
           {submitted ? (
             <article className="overflow-hidden rounded-[28px] border border-sky-100 bg-white text-center shadow-[0_16px_50px_rgba(24,95,140,.08)]">
-              <div className="bg-sky-600 px-6 py-8 text-white"><img src="/duck-learn.png" alt="Vịt nhỏ chúc mừng" className="mx-auto h-32 w-32 object-contain drop-shadow-lg"/><p className="mt-2 text-sm font-bold uppercase tracking-[.18em] text-sky-100">Đã hoàn thành đề {exam.id}</p><h2 className="mt-2 text-4xl font-extrabold">{score}/{exam.questions.length} câu đúng</h2></div>
+              <div className="bg-sky-600 px-6 py-8 text-white"><img src="duck-learn.png" alt="Vịt nhỏ chúc mừng" className="mx-auto h-32 w-32 object-contain drop-shadow-lg"/><p className="mt-2 text-sm font-bold uppercase tracking-[.18em] text-sky-100">Đã hoàn thành đề {exam.id}</p><h2 className="mt-2 text-4xl font-extrabold">{score}/{exam.questions.length} câu đúng</h2></div>
               <div className="p-7">
                 <p className="text-lg text-slate-600">{score >= 20 ? 'Xuất sắc! Vịt Nhỏ thấy bạn đã nắm bài rất chắc.' : score >= 15 ? 'Làm tốt lắm! Xem lại vài câu sai là bạn sẽ tiến bộ nhanh.' : 'Mình cùng xem lại đáp án rồi thử lần nữa nhé.'}</p>
                 <div className="mt-7 space-y-3 text-left">
