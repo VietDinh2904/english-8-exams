@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { exams } from '@/lib/exams';
 
 type Answers = Record<number, number>;
@@ -15,6 +16,13 @@ function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
   const secs = (seconds % 60).toString().padStart(2, '0');
   return `${mins}:${secs}`;
+}
+
+function UnderlinedOption({ text, target }: { text: string; target?: string }) {
+  if (!target) return <>{text}</>;
+  const start = text.toLowerCase().indexOf(target.toLowerCase());
+  if (start < 0) return <>{text}</>;
+  return <>{text.slice(0, start)}<u className="decoration-2 underline-offset-4">{text.slice(start, start + target.length)}</u>{text.slice(start + target.length)}</>;
 }
 
 export default function Home() {
@@ -29,6 +37,8 @@ export default function Home() {
   const selected = answers[question.id];
   const isAnswered = selected !== undefined;
   const isCorrect = selected === question.answer;
+  const trueFalseQuestions = exam.questions.filter((item) => item.section === 'Reading' && item.options.length === 2 && item.options[0] === 'True' && item.options[1] === 'False');
+  const isTrueFalseBlock = trueFalseQuestions.some((item) => item.id === question.id);
 
   const score = useMemo(() => exam.questions.filter((item) => answers[item.id] === item.answer).length, [answers, exam]);
   const answeredCount = Object.keys(answers).length;
@@ -123,7 +133,7 @@ export default function Home() {
         <section className="min-w-0">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div><p className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-sky-700"><BookOpen className="size-4"/> {question.section}</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{exam.title}</h1></div>
-            <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">Câu {questionIndex + 1} / {exam.questions.length}</span>
+            <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">{isTrueFalseBlock ? `Câu ${exam.questions.indexOf(trueFalseQuestions[0]) + 1}–${exam.questions.indexOf(trueFalseQuestions.at(-1)!) + 1}` : `Câu ${questionIndex + 1}`} / {exam.questions.length}</span>
           </div>
           <Progress value={(answeredCount / exam.questions.length) * 100} className="mb-5 h-2.5" />
 
@@ -136,24 +146,47 @@ export default function Home() {
             <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_16px_50px_rgba(24,95,140,.08)] sm:p-8">
               <div className="mb-5 flex items-center justify-between gap-3"><span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">{question.section === 'Reading' ? `Bài đọc · ${exam.passageTitle}` : 'Ngữ âm · Từ vựng · Ngữ pháp'}</span><button onClick={toggleFlag} className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${flagged.includes(question.id) ? 'bg-amber-100 text-amber-800' : 'text-slate-500 hover:bg-slate-50'}`}><Flag className="size-4" fill={flagged.includes(question.id) ? 'currentColor' : 'none'}/> {flagged.includes(question.id) ? 'Đã đánh dấu' : 'Đánh dấu'}</button></div>
               {question.section === 'Reading' && <div className="mb-6 max-h-52 overflow-y-auto rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-[15px] leading-7 text-slate-700"><strong className="mb-2 block text-amber-900">{exam.passageTitle}</strong>{exam.passage}</div>}
-              <p className="mb-5 text-lg font-semibold leading-relaxed">{question.prompt}</p>
-              <RadioGroup value={isAnswered ? String(selected) : ''} onValueChange={(value) => chooseAnswer(Number(value))} className="grid gap-3">
-                {question.options.map((option, index) => {
-                  const chosen = selected === index;
-                  const correct = isAnswered && index === question.answer;
-                  const wrong = chosen && !isCorrect;
-                  return <label key={option} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${correct ? 'border-emerald-400 bg-emerald-50' : wrong ? 'border-rose-400 bg-rose-50' : chosen ? 'border-sky-500 bg-sky-50' : 'border-slate-200 hover:border-sky-300 hover:bg-sky-50/40'}`}><RadioGroupItem value={String(index)} className="mt-0.5"/><span className="flex-1 text-base font-medium"><b className="mr-2">{String.fromCharCode(65 + index)}.</b>{option}</span>{correct && <Check className="size-5 text-emerald-600"/>}{wrong && <X className="size-5 text-rose-600"/>}</label>;
-                })}
-              </RadioGroup>
-              {isAnswered && <div aria-live="polite" className={`mt-5 rounded-2xl border p-4 ${isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}><strong>{isCorrect ? 'Chính xác!' : `Chưa đúng. Đáp án: ${String.fromCharCode(65 + question.answer)}. ${question.options[question.answer]}`}</strong><p className="mt-1 text-sm leading-relaxed opacity-85">{question.explanation}</p></div>}
-              <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questionIndex === exam.questions.length - 1 ? <Button disabled={!answeredCount} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">Nộp bài</Button> : <Button onClick={() => setQuestionIndex((value) => value + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button>}</div>
+              {isTrueFalseBlock ? (
+                <div>
+                  <p className="mb-4 text-lg font-semibold">Decide whether each statement is True or False.</p>
+                  <div className="overflow-hidden rounded-2xl border border-slate-200">
+                    <Table>
+                      <TableHeader><TableRow className="bg-[#123c5a] hover:bg-[#123c5a]"><TableHead className="w-full min-w-64 text-white">Câu nhận định</TableHead><TableHead className="w-24 text-center text-white">True</TableHead><TableHead className="w-24 text-center text-white">False</TableHead></TableRow></TableHeader>
+                      <TableBody>{trueFalseQuestions.map((item, rowIndex) => {
+                        const rowAnswer = answers[item.id];
+                        const rowAnswered = rowAnswer !== undefined;
+                        const rowCorrect = rowAnswer === item.answer;
+                        return <TableRow key={item.id} className={rowAnswered ? rowCorrect ? 'bg-emerald-50/60' : 'bg-rose-50/70' : ''}>
+                          <TableCell className="whitespace-normal py-4 align-top text-base font-medium"><span className="mr-2 font-bold">{exam.questions.indexOf(item) + 1}.</span>{item.prompt}{rowAnswered && <div className={`mt-3 rounded-xl p-3 text-sm font-normal leading-relaxed ${rowCorrect ? 'bg-emerald-100/70 text-emerald-900' : 'bg-rose-100/80 text-rose-900'}`}><strong>{rowCorrect ? 'Chính xác. ' : `Chưa đúng — đáp án là ${item.options[item.answer]}. `}</strong>{item.explanation}</div>}</TableCell>
+                          {[0,1].map((value) => <TableCell key={value} className="text-center align-top"><button onClick={() => setAnswers((current) => ({ ...current, [item.id]: value }))} aria-label={`Câu ${rowIndex + 1}: chọn ${value === 0 ? 'True' : 'False'}`} aria-pressed={rowAnswer === value} className={`mx-auto grid h-10 w-10 place-items-center rounded-full border-2 transition ${rowAnswer === value ? value === item.answer ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-rose-500 bg-rose-500 text-white' : 'border-slate-300 bg-white hover:border-sky-500'}`}>{rowAnswer === value && (value === item.answer ? <Check className="size-5"/> : <X className="size-5"/>)}</button></TableCell>)}
+                        </TableRow>;
+                      })}</TableBody>
+                    </Table>
+                  </div>
+                  <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" onClick={() => setQuestionIndex(Math.max(0, exam.questions.indexOf(trueFalseQuestions[0]) - 1))} className="rounded-xl"><ChevronLeft/> Câu trước</Button><Button disabled={!answeredCount} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">Nộp bài</Button></div>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-5 text-lg font-semibold leading-relaxed">{question.prompt}</p>
+                  <RadioGroup value={isAnswered ? String(selected) : ''} onValueChange={(value) => chooseAnswer(Number(value))} className="grid gap-3">
+                    {question.options.map((option, index) => {
+                      const chosen = selected === index;
+                      const correct = isAnswered && index === question.answer;
+                      const wrong = chosen && !isCorrect;
+                      return <label key={option} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${correct ? 'border-emerald-400 bg-emerald-50' : wrong ? 'border-rose-400 bg-rose-50' : chosen ? 'border-sky-500 bg-sky-50' : 'border-slate-200 hover:border-sky-300 hover:bg-sky-50/40'}`}><RadioGroupItem value={String(index)} className="mt-0.5"/><span className="flex-1 text-base font-medium"><b className="mr-2">{String.fromCharCode(65 + index)}.</b><UnderlinedOption text={option} target={question.underlines?.[index]} /></span>{correct && <Check className="size-5 text-emerald-600"/>}{wrong && <X className="size-5 text-rose-600"/>}</label>;
+                    })}
+                  </RadioGroup>
+                  {isAnswered && <div aria-live="polite" className={`mt-5 overflow-hidden rounded-2xl border ${isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}><div className={`px-4 py-2 text-sm font-bold uppercase tracking-wide ${isCorrect ? 'bg-emerald-100' : 'bg-rose-100'}`}>Hướng dẫn giải chi tiết</div><div className="p-4"><strong>{isCorrect ? 'Chính xác!' : `Chưa đúng. Đáp án: ${String.fromCharCode(65 + question.answer)}. ${question.options[question.answer]}`}</strong><p className="mt-2 text-[15px] leading-7 opacity-90">{question.explanation}</p></div></div>}
+                  <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questionIndex === exam.questions.length - 1 ? <Button disabled={!answeredCount} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">Nộp bài</Button> : <Button onClick={() => setQuestionIndex((value) => value + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button>}</div>
+                </>
+              )}
             </article>
           )}
         </section>
 
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-          <div className="rounded-3xl bg-[#123c5a] p-5 text-white shadow-lg shadow-sky-100"><div className="mb-3 flex items-center justify-between"><span className="text-sm text-sky-100">Thời gian còn lại</span><Clock3 className="size-5 text-amber-300"/></div><strong suppressHydrationWarning className="font-mono text-3xl tracking-tight">{formatTime(secondsLeft)}</strong><div className="mt-4 flex justify-between border-t border-white/15 pt-3 text-sm"><span>Đã làm</span><b>{answeredCount}/{exam.questions.length}</b></div></div>
-          <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{exam.questions.map((item, index) => { const done = answers[item.id] !== undefined; const correct = answers[item.id] === item.answer; return <button aria-label={`Mở câu ${index + 1}`} key={item.id} onClick={() => { setQuestionIndex(index); setSubmitted(false); }} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-600 ring-offset-2' : ''} ${done ? correct ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{index + 1}{flagged.includes(item.id) && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-amber-400"/>}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-500"><span><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-emerald-300"/>Đúng</span><span><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-rose-300"/>Cần xem lại</span></div></div>
+          <div className="rounded-3xl bg-[#123c5a] p-5 text-white shadow-lg shadow-sky-100"><div className="mb-3 flex items-center justify-between"><span className="text-sm text-sky-100">Thời gian còn lại</span><Clock3 className="size-5 text-amber-300"/></div><strong suppressHydrationWarning className="font-mono text-3xl tracking-tight">{formatTime(secondsLeft)}</strong><div className="mt-4 flex justify-between border-t border-white/15 pt-3 text-sm"><span>Đã làm</span><b>{answeredCount}/{exam.questions.length}</b></div><Button disabled={!answeredCount} onClick={() => setSubmitted(true)} className="mt-4 w-full bg-amber-500 font-bold text-white hover:bg-amber-600">NỘP BÀI</Button></div>
+          <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{exam.questions.map((item, index) => { const done = answers[item.id] !== undefined; const marked = flagged.includes(item.id); return <button aria-label={`Mở câu ${index + 1}`} key={item.id} onClick={() => { setQuestionIndex(index); setSubmitted(false); }} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-700 ring-offset-2' : ''} ${marked ? 'bg-indigo-400 text-white' : done ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{index + 1}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-sky-500"/>Câu đã làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-200"/>Câu chưa làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-indigo-400"/>Đã làm nhưng chưa chắc chắn</span></div></div>
           <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5"><Sparkles className="mb-2 size-5 text-amber-600"/><strong className="block text-amber-900">Mẹo của Vịt</strong><p className="mt-1 text-sm leading-relaxed text-amber-800">Sai cũng không sao — đọc lời giải ngay dưới câu hỏi rồi thử nhớ quy tắc nhé.</p></div>
         </aside>
       </div>
