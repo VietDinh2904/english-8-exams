@@ -15,6 +15,7 @@ export type Exam = {
   passageTitle: string;
   passage: string;
   questions: Question[];
+  reviewNotes?: { title: string; rule: string; example: string }[];
 };
 
 const q = (id: number, section: Question['section'], prompt: string, options: string[], answer: number, explanation: string, underlines?: string[]): Question => ({ id, section, prompt, options, answer, explanation, underlines });

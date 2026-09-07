@@ -136,7 +136,7 @@ export default function Home() {
       <nav className="grid gap-2">
         {availableExams.map((item, index) => (
           <button key={item.id} onClick={() => selectExam(index)} className={`group rounded-2xl px-3 py-3 text-left transition ${index === examIndex ? 'bg-sky-600 text-white shadow-md shadow-sky-100' : 'bg-sky-50 text-[#15324a] hover:bg-sky-100'}`}>
-            <span className="block font-bold">{grade === 8 ? `Đề số ${item.id}` : 'Khảo sát đầu năm'}</span><span className={`mt-0.5 block text-xs ${index === examIndex ? 'text-sky-100' : 'text-slate-500'}`}>{item.theme}</span>
+            <span className="block font-bold">{grade === 8 ? `Đề số ${item.id}` : item.id === 1 ? 'Khảo sát đầu năm' : 'Ôn tập Unit 1–3'}</span><span className={`mt-0.5 block text-xs ${index === examIndex ? 'text-sky-100' : 'text-slate-500'}`}>{item.theme}</span>
           </button>
         ))}
       </nav>
@@ -154,7 +154,7 @@ export default function Home() {
           <div className="flex rounded-2xl border border-sky-100 bg-sky-50 p-1" aria-label="Chọn khối lớp">
             {([8, 9] as GradeLevel[]).map((item) => <button key={item} onClick={() => switchGrade(item)} className={`rounded-xl px-3 py-2 text-sm font-extrabold transition sm:px-5 ${grade === item ? 'bg-sky-600 text-white shadow-sm' : 'text-sky-800 hover:bg-white'}`} aria-pressed={grade === item}>English {item}</button>)}
           </div>
-          <span className="hidden rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800 xl:inline">{grade === 8 ? 'Global Success · Unit 1–3' : 'Khảo sát đầu năm · 25 câu'}</span>
+          <span className="hidden rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800 xl:inline">{grade === 8 ? 'Global Success · Unit 1–3' : '2 mục học · 50 câu'}</span>
           <Sheet><SheetTrigger render={<Button variant="outline" size="icon" className="lg:hidden" aria-label="Mở danh sách đề" />}><Menu /></SheetTrigger><SheetContent side="left"><SheetTitle className="mb-5">Chọn đề</SheetTitle>{examMenu}</SheetContent></Sheet>
         </div>
       </header>
@@ -171,6 +171,16 @@ export default function Home() {
             <button onClick={() => switchMode('practice')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'practice' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Luyện tập · Giải ngay</button>
             <button onClick={() => switchMode('test')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'test' ? 'bg-[#123c5a] text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Làm bài test · Chấm sau</button>
           </div>
+          {exam.reviewNotes && <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
+            <summary className="cursor-pointer px-5 py-4 font-bold text-amber-950">Kiến thức cần nhớ trước khi luyện</summary>
+            <div className="grid gap-3 border-t border-amber-200 p-4 sm:grid-cols-2">
+              {exam.reviewNotes.map((note) => <div key={note.title} className="rounded-2xl bg-white p-4 shadow-sm">
+                <strong className="text-sky-800">{note.title}</strong>
+                <p className="mt-1 text-sm leading-6 text-slate-700">{note.rule}</p>
+                <p className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-sm font-medium text-sky-900">Ví dụ: {note.example}</p>
+              </div>)}
+            </div>
+          </details>}
           <Progress value={(answeredCount / exam.questions.length) * 100} className="mb-5 h-2.5" />
 
           {submitted ? (
