@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { exams } from '@/lib/exams';
 
 type Answers = Record<number, number>;
+type ExamMode = 'practice' | 'test';
 type ModelContext = { registerTool: (tool: Record<string, unknown>, options?: { signal: AbortSignal }) => void | Promise<void> };
 
 function formatTime(seconds: number) {
@@ -26,6 +27,7 @@ function UnderlinedOption({ text, target }: { text: string; target?: string }) {
 }
 
 export default function Home() {
+  const [mode, setMode] = useState<ExamMode>('practice');
   const [examIndex, setExamIndex] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
@@ -42,6 +44,8 @@ export default function Home() {
 
   const score = useMemo(() => exam.questions.filter((item) => answers[item.id] === item.answer).length, [answers, exam]);
   const answeredCount = Object.keys(answers).length;
+  const feedbackVisible = mode === 'practice' || submitted;
+  const canSubmit = mode === 'test' ? answeredCount === exam.questions.length : answeredCount > 0;
 
   useEffect(() => {
     if (submitted || secondsLeft <= 0) return;
@@ -57,6 +61,15 @@ export default function Home() {
     setSubmitted(false);
     setSecondsLeft(60 * 60);
   }, []);
+
+  const switchMode = (nextMode: ExamMode) => {
+    setMode(nextMode);
+    setQuestionIndex(0);
+    setAnswers({});
+    setFlagged([]);
+    setSubmitted(false);
+    setSecondsLeft(60 * 60);
+  };
 
   const chooseAnswer = useCallback((value: number) => {
     setAnswers((current) => ({ ...current, [exam.questions[questionIndex].id]: value }));
@@ -91,12 +104,14 @@ export default function Home() {
           const value = (input as { optionNumber?: number }).optionNumber;
           if (!Number.isInteger(value) || !value || value < 1 || value > question.options.length) throw new Error(`optionNumber must be from 1 to ${question.options.length}`);
           chooseAnswer(value - 1);
-          return { question: question.id, correct: value - 1 === question.answer, correctOptionNumber: question.answer + 1 };
+          return mode === 'practice'
+            ? { question: question.id, correct: value - 1 === question.answer, correctOptionNumber: question.answer + 1 }
+            : { question: question.id, status: 'recorded' };
         },
       }, { signal: lifecycle.signal })).catch(report);
     } catch { report(); }
     return () => lifecycle.abort();
-  }, [chooseAnswer, question, selectExam]);
+  }, [chooseAnswer, mode, question, selectExam]);
 
   const resetExam = () => selectExam(examIndex);
   const toggleFlag = () => setFlagged((items) => items.includes(question.id) ? items.filter((id) => id !== question.id) : [...items, question.id]);
@@ -135,12 +150,34 @@ export default function Home() {
             <div><p className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-sky-700"><BookOpen className="size-4"/> {question.section}</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{exam.title}</h1></div>
             <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">{isTrueFalseBlock ? `Câu ${exam.questions.indexOf(trueFalseQuestions[0]) + 1}–${exam.questions.indexOf(trueFalseQuestions.at(-1)!) + 1}` : `Câu ${questionIndex + 1}`} / {exam.questions.length}</span>
           </div>
+          <div className="mb-5 grid grid-cols-2 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-sm">
+            <button onClick={() => switchMode('practice')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'practice' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Luyện tập · Giải ngay</button>
+            <button onClick={() => switchMode('test')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'test' ? 'bg-[#123c5a] text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Làm bài test · Chấm sau</button>
+          </div>
           <Progress value={(answeredCount / exam.questions.length) * 100} className="mb-5 h-2.5" />
 
           {submitted ? (
             <article className="overflow-hidden rounded-[28px] border border-sky-100 bg-white text-center shadow-[0_16px_50px_rgba(24,95,140,.08)]">
               <div className="bg-sky-600 px-6 py-8 text-white"><img src="/duck-learn.png" alt="Vịt nhỏ chúc mừng" className="mx-auto h-32 w-32 object-contain drop-shadow-lg"/><p className="mt-2 text-sm font-bold uppercase tracking-[.18em] text-sky-100">Đã hoàn thành đề {exam.id}</p><h2 className="mt-2 text-4xl font-extrabold">{score}/{exam.questions.length} câu đúng</h2></div>
-              <div className="p-7"><p className="text-lg text-slate-600">{score >= 8 ? 'Xuất sắc! Vịt Nhỏ thấy bạn đã nắm bài rất chắc.' : score >= 6 ? 'Làm tốt lắm! Xem lại vài câu sai là bạn sẽ tiến bộ nhanh.' : 'Mình cùng xem lại đáp án rồi thử lần nữa nhé.'}</p><Button onClick={resetExam} size="lg" className="mt-6 rounded-xl bg-sky-600"><RotateCcw /> Làm lại đề</Button></div>
+              <div className="p-7">
+                <p className="text-lg text-slate-600">{score >= 20 ? 'Xuất sắc! Vịt Nhỏ thấy bạn đã nắm bài rất chắc.' : score >= 15 ? 'Làm tốt lắm! Xem lại vài câu sai là bạn sẽ tiến bộ nhanh.' : 'Mình cùng xem lại đáp án rồi thử lần nữa nhé.'}</p>
+                <div className="mt-7 space-y-3 text-left">
+                  <h3 className="text-lg font-bold">Đáp án và hướng dẫn giải</h3>
+                  {exam.questions.map((item, index) => {
+                    const chosen = answers[item.id];
+                    const correct = chosen === item.answer;
+                    return <details key={item.id} className={`rounded-2xl border ${correct ? 'border-emerald-200 bg-emerald-50/60' : 'border-rose-200 bg-rose-50/60'}`}>
+                      <summary className="cursor-pointer list-none p-4 font-semibold"><span className={`mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm text-white ${correct ? 'bg-emerald-500' : 'bg-rose-500'}`}>{correct ? '✓' : '×'}</span>Câu {index + 1}: {item.prompt}</summary>
+                      <div className="border-t border-current/10 px-4 pb-4 pt-3 text-sm leading-6">
+                        <p>Bạn chọn: <strong>{chosen === undefined ? 'Chưa trả lời' : `${String.fromCharCode(65 + chosen)}. ${item.options[chosen]}`}</strong></p>
+                        <p>Đáp án đúng: <strong>{String.fromCharCode(65 + item.answer)}. {item.options[item.answer]}</strong></p>
+                        <p className="mt-2 text-slate-700">{item.explanation}</p>
+                      </div>
+                    </details>;
+                  })}
+                </div>
+                <Button onClick={resetExam} size="lg" className="mt-7 rounded-xl bg-sky-600"><RotateCcw /> Làm lại đề</Button>
+              </div>
             </article>
           ) : (
             <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_16px_50px_rgba(24,95,140,.08)] sm:p-8">
@@ -156,14 +193,14 @@ export default function Home() {
                         const rowAnswer = answers[item.id];
                         const rowAnswered = rowAnswer !== undefined;
                         const rowCorrect = rowAnswer === item.answer;
-                        return <TableRow key={item.id} className={rowAnswered ? rowCorrect ? 'bg-emerald-50/60' : 'bg-rose-50/70' : ''}>
-                          <TableCell className="whitespace-normal py-4 align-top text-base font-medium"><span className="mr-2 font-bold">{exam.questions.indexOf(item) + 1}.</span>{item.prompt}{rowAnswered && <div className={`mt-3 rounded-xl p-3 text-sm font-normal leading-relaxed ${rowCorrect ? 'bg-emerald-100/70 text-emerald-900' : 'bg-rose-100/80 text-rose-900'}`}><strong>{rowCorrect ? 'Chính xác. ' : `Chưa đúng — đáp án là ${item.options[item.answer]}. `}</strong>{item.explanation}</div>}</TableCell>
-                          {[0,1].map((value) => <TableCell key={value} className="text-center align-top"><button onClick={() => setAnswers((current) => ({ ...current, [item.id]: value }))} aria-label={`Câu ${rowIndex + 1}: chọn ${value === 0 ? 'True' : 'False'}`} aria-pressed={rowAnswer === value} className={`mx-auto grid h-10 w-10 place-items-center rounded-full border-2 transition ${rowAnswer === value ? value === item.answer ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-rose-500 bg-rose-500 text-white' : 'border-slate-300 bg-white hover:border-sky-500'}`}>{rowAnswer === value && (value === item.answer ? <Check className="size-5"/> : <X className="size-5"/>)}</button></TableCell>)}
+                        return <TableRow key={item.id} className={rowAnswered && feedbackVisible ? rowCorrect ? 'bg-emerald-50/60' : 'bg-rose-50/70' : ''}>
+                          <TableCell className="whitespace-normal py-4 align-top text-base font-medium"><span className="mr-2 font-bold">{exam.questions.indexOf(item) + 1}.</span>{item.prompt}{rowAnswered && feedbackVisible && <div className={`mt-3 rounded-xl p-3 text-sm font-normal leading-relaxed ${rowCorrect ? 'bg-emerald-100/70 text-emerald-900' : 'bg-rose-100/80 text-rose-900'}`}><strong>{rowCorrect ? 'Chính xác. ' : `Chưa đúng — đáp án là ${item.options[item.answer]}. `}</strong>{item.explanation}</div>}</TableCell>
+                          {[0,1].map((value) => <TableCell key={value} className="text-center align-top"><button onClick={() => setAnswers((current) => ({ ...current, [item.id]: value }))} aria-label={`Câu ${rowIndex + 1}: chọn ${value === 0 ? 'True' : 'False'}`} aria-pressed={rowAnswer === value} className={`mx-auto grid h-10 w-10 place-items-center rounded-full border-2 transition ${rowAnswer === value ? feedbackVisible ? value === item.answer ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-rose-500 bg-rose-500 text-white' : 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 bg-white hover:border-sky-500'}`}>{rowAnswer === value && (feedbackVisible ? value === item.answer ? <Check className="size-5"/> : <X className="size-5"/> : <Check className="size-5"/>)}</button></TableCell>)}
                         </TableRow>;
                       })}</TableBody>
                     </Table>
                   </div>
-                  <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" onClick={() => setQuestionIndex(Math.max(0, exam.questions.indexOf(trueFalseQuestions[0]) - 1))} className="rounded-xl"><ChevronLeft/> Câu trước</Button><Button disabled={!answeredCount} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">Nộp bài</Button></div>
+                  <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" onClick={() => setQuestionIndex(Math.max(0, exam.questions.indexOf(trueFalseQuestions[0]) - 1))} className="rounded-xl"><ChevronLeft/> Câu trước</Button><Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">Nộp bài</Button></div>
                 </div>
               ) : (
                 <>
@@ -173,11 +210,11 @@ export default function Home() {
                       const chosen = selected === index;
                       const correct = isAnswered && index === question.answer;
                       const wrong = chosen && !isCorrect;
-                      return <label key={option} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${correct ? 'border-emerald-400 bg-emerald-50' : wrong ? 'border-rose-400 bg-rose-50' : chosen ? 'border-sky-500 bg-sky-50' : 'border-slate-200 hover:border-sky-300 hover:bg-sky-50/40'}`}><RadioGroupItem value={String(index)} className="mt-0.5"/><span className="flex-1 text-base font-medium"><b className="mr-2">{String.fromCharCode(65 + index)}.</b><UnderlinedOption text={option} target={question.underlines?.[index]} /></span>{correct && <Check className="size-5 text-emerald-600"/>}{wrong && <X className="size-5 text-rose-600"/>}</label>;
+                      return <label key={option} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${feedbackVisible && correct ? 'border-emerald-400 bg-emerald-50' : feedbackVisible && wrong ? 'border-rose-400 bg-rose-50' : chosen ? 'border-sky-500 bg-sky-50' : 'border-slate-200 hover:border-sky-300 hover:bg-sky-50/40'}`}><RadioGroupItem value={String(index)} className="mt-0.5"/><span className="flex-1 text-base font-medium"><b className="mr-2">{String.fromCharCode(65 + index)}.</b><UnderlinedOption text={option} target={question.underlines?.[index]} /></span>{feedbackVisible && correct && <Check className="size-5 text-emerald-600"/>}{feedbackVisible && wrong && <X className="size-5 text-rose-600"/>}</label>;
                     })}
                   </RadioGroup>
-                  {isAnswered && <div aria-live="polite" className={`mt-5 overflow-hidden rounded-2xl border ${isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}><div className={`px-4 py-2 text-sm font-bold uppercase tracking-wide ${isCorrect ? 'bg-emerald-100' : 'bg-rose-100'}`}>Hướng dẫn giải chi tiết</div><div className="p-4"><strong>{isCorrect ? 'Chính xác!' : `Chưa đúng. Đáp án: ${String.fromCharCode(65 + question.answer)}. ${question.options[question.answer]}`}</strong><p className="mt-2 text-[15px] leading-7 opacity-90">{question.explanation}</p></div></div>}
-                  <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questionIndex === exam.questions.length - 1 ? <Button disabled={!answeredCount} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">Nộp bài</Button> : <Button onClick={() => setQuestionIndex((value) => value + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button>}</div>
+                  {isAnswered && feedbackVisible && <div aria-live="polite" className={`mt-5 overflow-hidden rounded-2xl border ${isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}><div className={`px-4 py-2 text-sm font-bold uppercase tracking-wide ${isCorrect ? 'bg-emerald-100' : 'bg-rose-100'}`}>Hướng dẫn giải chi tiết</div><div className="p-4"><strong>{isCorrect ? 'Chính xác!' : `Chưa đúng. Đáp án: ${String.fromCharCode(65 + question.answer)}. ${question.options[question.answer]}`}</strong><p className="mt-2 text-[15px] leading-7 opacity-90">{question.explanation}</p></div></div>}
+                  <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questionIndex === exam.questions.length - 1 ? <Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">Nộp bài</Button> : <Button onClick={() => setQuestionIndex((value) => value + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button>}</div>
                 </>
               )}
             </article>
@@ -185,9 +222,9 @@ export default function Home() {
         </section>
 
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-          <div className="rounded-3xl bg-[#123c5a] p-5 text-white shadow-lg shadow-sky-100"><div className="mb-3 flex items-center justify-between"><span className="text-sm text-sky-100">Thời gian còn lại</span><Clock3 className="size-5 text-amber-300"/></div><strong suppressHydrationWarning className="font-mono text-3xl tracking-tight">{formatTime(secondsLeft)}</strong><div className="mt-4 flex justify-between border-t border-white/15 pt-3 text-sm"><span>Đã làm</span><b>{answeredCount}/{exam.questions.length}</b></div><Button disabled={!answeredCount} onClick={() => setSubmitted(true)} className="mt-4 w-full bg-amber-500 font-bold text-white hover:bg-amber-600">NỘP BÀI</Button></div>
-          <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{exam.questions.map((item, index) => { const done = answers[item.id] !== undefined; const marked = flagged.includes(item.id); return <button aria-label={`Mở câu ${index + 1}`} key={item.id} onClick={() => { setQuestionIndex(index); setSubmitted(false); }} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-700 ring-offset-2' : ''} ${marked ? 'bg-indigo-400 text-white' : done ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{index + 1}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-sky-500"/>Câu đã làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-200"/>Câu chưa làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-indigo-400"/>Đã làm nhưng chưa chắc chắn</span></div></div>
-          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5"><Sparkles className="mb-2 size-5 text-amber-600"/><strong className="block text-amber-900">Mẹo của Vịt</strong><p className="mt-1 text-sm leading-relaxed text-amber-800">Sai cũng không sao — đọc lời giải ngay dưới câu hỏi rồi thử nhớ quy tắc nhé.</p></div>
+          <div className="rounded-3xl bg-[#123c5a] p-5 text-white shadow-lg shadow-sky-100"><div className="mb-3 flex items-center justify-between"><span className="text-sm text-sky-100">Thời gian còn lại</span><Clock3 className="size-5 text-amber-300"/></div><strong suppressHydrationWarning className="font-mono text-3xl tracking-tight">{formatTime(secondsLeft)}</strong><div className="mt-4 flex justify-between border-t border-white/15 pt-3 text-sm"><span>Đã làm</span><b>{answeredCount}/{exam.questions.length}</b></div><Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="mt-4 w-full bg-amber-500 font-bold text-white hover:bg-amber-600">NỘP BÀI</Button>{mode === 'test' && answeredCount < exam.questions.length && <p className="mt-2 text-center text-xs leading-5 text-sky-100">Làm đủ 25 câu để mở nút nộp bài.</p>}</div>
+          <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{exam.questions.map((item, index) => { const done = answers[item.id] !== undefined; const marked = flagged.includes(item.id); return <button aria-label={`Mở câu ${index + 1}`} key={item.id} onClick={() => setQuestionIndex(index)} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-700 ring-offset-2' : ''} ${marked ? 'bg-indigo-400 text-white' : done ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{index + 1}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-sky-500"/>Câu đã làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-200"/>Câu chưa làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-indigo-400"/>Đã đánh dấu để xem lại</span></div></div>
+          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5"><Sparkles className="mb-2 size-5 text-amber-600"/><strong className="block text-amber-900">Mẹo của Vịt</strong><p className="mt-1 text-sm leading-relaxed text-amber-800">Lá cờ dùng để đánh dấu câu bạn còn phân vân. Trước khi nộp bài, hãy mở lại các ô màu tím để kiểm tra.</p></div>
         </aside>
       </div>
     </main>

@@ -19,7 +19,7 @@ export type Exam = {
 
 const q = (id: number, section: Question['section'], prompt: string, options: string[], answer: number, explanation: string, underlines?: string[]): Question => ({ id, section, prompt, options, answer, explanation, underlines });
 
-export const exams: Exam[] = [
+const baseExams: Exam[] = [
   {
     id: 1,
     title: 'Đề giữa học kỳ I · Đề số 1',
@@ -135,3 +135,120 @@ export const exams: Exam[] = [
     ],
   },
 ];
+
+type ExtraRow = [string, string[], number, string, string[]?];
+
+const makeExtras = (rows: ExtraRow[]): Question[] => rows.map((row, index) =>
+  q(index + 6, 'Language Focus', row[0], row[1], row[2], row[3], row[4]),
+);
+
+const extraSets: Record<number, Question[]> = {
+  1: makeExtras([
+    ['Choose the word whose underlined part is pronounced differently.',['school','character','chemistry','children'],3,'“ch” trong children đọc /tʃ/; trong school, character và chemistry đọc /k/. Vì vậy D có phần gạch chân phát âm khác.',['ch','ch','ch','ch']],
+    ['Choose the word with a different stress pattern.',['leisure','hobby','enjoy','social'],2,'Leisure, hobby và social nhấn âm 1; enjoy nhấn âm 2: /ɪnˈdʒɔɪ/. Vì vậy chọn C.'],
+    ['Mai is interested in ___ short videos.',['make','making','to make','made'],1,'Cấu trúc be interested in + V-ing: interested in making. Nghĩa: Mai thích làm video ngắn.'],
+    ['My brother spends two hours ___ online every evening.',['chat','to chat','chatting','chatted'],2,'Spend + thời gian + V-ing diễn tả dành bao lâu làm việc gì. Do đó dùng chatting.'],
+    ['I prefer reading books ___ playing computer games.',['than','to','with','for'],1,'Cấu trúc prefer A to B = thích A hơn B. Khi là hoạt động: prefer V-ing to V-ing.'],
+    ['Too much screen time can be harmful ___ your eyes.',['to','with','at','on'],0,'Cụm be harmful to = có hại cho. “Harmful to your eyes” nghĩa là có hại cho mắt.'],
+    ['Lan is a ___ member of our book club.',['activity','actively','active','activate'],2,'Trước danh từ member cần tính từ active. Activity là danh từ, actively là trạng từ.'],
+    ['We should use social media ___.',['responsible','responsibility','responsibly','response'],2,'Động từ use cần trạng từ responsibly để chỉ cách sử dụng: một cách có trách nhiệm.'],
+    ['Would you like ___ our study group?',['join','joining','to join','joined'],2,'Would you like + to V là cấu trúc mời hoặc hỏi mong muốn. Đáp án đúng là to join.'],
+    ['My friends ___ badminton in the park now.',['play','played','are playing','plays'],2,'Có “now” nên dùng hiện tại tiếp diễn: are + V-ing. Chủ ngữ số nhiều “friends” đi với are.'],
+    ['She usually ___ photos of flowers at weekends.',['take','takes','is taking','took'],1,'Usually chỉ thói quen, dùng hiện tại đơn. Chủ ngữ she nên động từ thêm -s: takes.'],
+    ['The opposite of “useful” is ___.',['careful','useless','helpful','hopeful'],1,'Tiền tố “-less” mang nghĩa không có; useless = vô ích, là từ trái nghĩa của useful.'],
+    ['Connect with people who have the same ___.',['interested','interests','interesting','interestingly'],1,'Sau “the same” cần danh từ; interests số nhiều chỉ những sở thích chung.'],
+    ['If you finish early, you ___ watch a short clip.',['can','should to','must to','are'],0,'Động từ khuyết thiếu can + động từ nguyên mẫu. Can watch nghĩa là có thể xem.'],
+    ['Facebook can support learning ___ students use it appropriately.',['but','if','although','so'],1,'If đưa ra điều kiện: Facebook hỗ trợ học tập nếu học sinh sử dụng đúng cách.'],
+  ]),
+  2: makeExtras([
+    ['Choose the word whose underlined part is pronounced differently.',['community','costume','custom','colourful'],0,'Chữ “u” trong community đọc /juː/; trong costume, custom và colourful gần âm /ʌ/. Chọn A.',['u','u','u','u']],
+    ['Choose the word with a different stress pattern.',['village','cattle','canal','harvest'],2,'Village, cattle, harvest nhấn âm 1; canal nhấn âm 2: /kəˈnæl/.'],
+    ['People in my village are very ___.',['friend','friendly','friendship','befriend'],1,'Sau “are very” cần tính từ friendly = thân thiện. Friend là danh từ.'],
+    ['Farmers use machines ___ crops faster.',['harvest','harvesting','to harvest','harvested'],2,'Use something to V diễn tả mục đích: dùng máy móc để thu hoạch.'],
+    ['My grandfather is good at ___ cattle.',['herd','herding','to herd','herded'],1,'Be good at + V-ing: giỏi làm gì. Vì vậy dùng herding.'],
+    ['The air in the countryside is ___ than in the city.',['fresh','freshest','fresher','more fresh'],2,'So sánh hơn của tính từ ngắn fresh là fresher + than.'],
+    ['There are ___ cars in the village than in the city.',['less','fewer','few','little'],1,'Cars là danh từ đếm được số nhiều nên dùng fewer, không dùng less.'],
+    ['We often help our parents ___ the fruit.',['pick','picking to','picked','picks'],0,'Help somebody (to) V; ở đây đáp án đúng là động từ nguyên mẫu pick.'],
+    ['The villagers live ___.',['peace','peaceful','peacefully','peacefulness'],2,'Động từ live cần trạng từ peacefully = một cách yên bình.'],
+    ['A ___ is a narrow waterway used for boats or irrigation.',['canal','field','orchard','temple'],0,'Canal nghĩa là kênh đào, một đường nước hẹp dùng cho thuyền hoặc tưới tiêu.'],
+    ['People grow fruit trees in an ___.',['pond','orchard','field rice','cattle'],1,'Orchard là vườn cây ăn quả. Pond là ao; cattle là gia súc.'],
+    ['The Khmer are one of the largest ethnic ___ in Viet Nam.',['group','groups','grouping','grouped'],1,'One of the + tính từ bậc nhất + danh từ số nhiều, nên dùng groups.'],
+    ['Traditional clothes are worn ___ special occasions.',['in','on','at to','from'],1,'Cụm giới từ cố định on special occasions = vào những dịp đặc biệt.'],
+    ['The children enjoy ___ traditional games.',['play','to playing','playing','played'],2,'Enjoy + V-ing, nên chọn playing.'],
+    ['Life moves ___ in the countryside.',['slow','more slowly','more slow','slowest'],1,'Bổ nghĩa cho động từ moves cần trạng từ; dạng so sánh hơn là more slowly.'],
+  ]),
+  3: makeExtras([
+    ['Choose the word whose underlined part is pronounced differently.',['action','station','question','education'],2,'“tion” thường đọc /ʃən/ trong action, station, education; question có âm /tʃən/.',['tion','tion','tion','tion']],
+    ['Choose the word with a different stress pattern.',['problem','teacher','advice','student'],2,'Problem, teacher, student nhấn âm 1; advice nhấn âm 2: /ədˈvaɪs/.'],
+    ['You ___ tell an adult if someone bullies you.',['should','should to','are','do'],0,'Should + V nguyên mẫu diễn tả lời khuyên: should tell.'],
+    ['Students must not ___ mean messages online.',['sending','sent','send','to send'],2,'Sau must not dùng động từ nguyên mẫu: must not send.'],
+    ['She felt ___ after talking to the school counsellor.',['good','better','best','well than'],1,'Ngữ cảnh cho thấy trạng thái được cải thiện; dạng so sánh hơn của good là better.'],
+    ['The teacher asked us ___ kind to one another.',['be','being','to be','been'],2,'Ask somebody to V: yêu cầu ai làm gì. Vì vậy dùng to be.'],
+    ['Bullying can have a serious ___ on students.',['affect','effect','effective','effectively'],1,'Have an effect on = có ảnh hưởng đến. Effect là danh từ; affect là động từ.'],
+    ['Everyone deserves to feel ___ at school.',['safety','safe','safely','save'],1,'Sau feel là tính từ chỉ trạng thái: safe = an toàn.'],
+    ['Do not leave a classmate ___ from the group.',['out','up','on','at'],0,'Leave somebody out = loại ai ra, không cho tham gia.'],
+    ['The school created rules ___ bullying.',['stop','to stop','stopping to','stopped'],1,'To stop là động từ nguyên mẫu chỉ mục đích: tạo quy định để ngăn bắt nạt.'],
+    ['If you see bullying, ___ silent.',['do not stay','not stay','not staying','did not'],0,'Câu mệnh lệnh phủ định: Do not + V nguyên mẫu.'],
+    ['The word closest in meaning to “mean” is ___.',['kind','unkind','quiet','helpful'],1,'Mean trong ngữ cảnh hành vi bắt nạt nghĩa là xấu tính/không tử tế, gần nhất với unkind.'],
+    ['Our class discusses problems ___.',['open','opening','openly','openness'],2,'Động từ discusses cần trạng từ openly = một cách cởi mở.'],
+    ['Neither Nam nor his friends ___ afraid to ask for help.',['is','are','was','be'],1,'Với neither...nor, động từ hòa hợp với chủ ngữ gần nhất “friends” số nhiều nên dùng are.'],
+    ['Schools take action, ___ bullying goes down.',['so','but','or','although'],0,'So nối nguyên nhân–kết quả: nhà trường hành động, vì vậy bắt nạt giảm.'],
+  ]),
+  4: makeExtras([
+    ['Choose the word whose underlined part is pronounced differently.',['village','cottage','message','game'],3,'Chữ g trong village, cottage, message đọc /dʒ/; game đọc /g/.',['g','g','g','g']],
+    ['Choose the word with a different stress pattern.',['picturesque','comfortable','hospitable','traditional'],0,'Picturesque nhấn âm cuối; các từ còn lại không nhấn âm cuối.'],
+    ['The village is surrounded ___ green fields.',['by','with','from','at'],0,'Cụm bị động be surrounded by = được bao quanh bởi.'],
+    ['My family has lived here ___ twenty years.',['since','for','from','in'],1,'For + khoảng thời gian; twenty years là một khoảng thời gian.'],
+    ['There is not ___ traffic in my village.',['many','much','a few','several'],1,'Traffic là danh từ không đếm được nên dùng much trong câu phủ định.'],
+    ['Villagers often meet ___ the evening.',['on','at','in','by'],2,'Dùng in với các buổi trong ngày: in the evening.'],
+    ['Children sometimes help their parents ___ cattle.',['raise','raises','raised','raising to'],0,'Help somebody (to) V; raise cattle = chăn nuôi gia súc.'],
+    ['The scenery is so ___ that many tourists take photos.',['beauty','beautiful','beautifully','beautify'],1,'Sau be và so cần tính từ beautiful.'],
+    ['This road is ___ than the old one.',['wide','wider','widest','more wider'],1,'So sánh hơn của tính từ ngắn wide là wider; không dùng more wider.'],
+    ['The villagers know each other ___.',['good','well','betterly','bestly'],1,'Know là động từ nên dùng trạng từ well.'],
+    ['A person who raises crops and animals is a ___.',['farmer','fisher','driver','tourist'],0,'Farmer là nông dân, người trồng trọt và chăn nuôi.'],
+    ['Rice is usually ___ in large fields.',['grow','grew','grown','growing'],2,'Câu bị động hiện tại: is + past participle; quá khứ phân từ của grow là grown.'],
+    ['We love the village ___ it is peaceful.',['because','but','although','however'],0,'Because giới thiệu lý do: yêu ngôi làng vì nơi đó yên bình.'],
+    ['How ___ is the market from your house?',['long','far','often','much'],1,'How far dùng để hỏi khoảng cách.'],
+    ['The opposite of “noisy” is ___.',['quiet','crowded','busy','modern'],0,'Noisy = ồn ào; từ trái nghĩa là quiet = yên tĩnh.'],
+  ]),
+  5: makeExtras([
+    ['Choose the word whose underlined part is pronounced differently.',['nature','national','animal','farmland'],0,'Chữ a trong nature đọc /eɪ/; trong national, animal, farmland không đọc /eɪ/.',['a','a','a','a']],
+    ['Choose the word with a different stress pattern.',['mountain','river','coastline','relax'],3,'Mountain, river, coastline nhấn âm 1; relax nhấn âm 2.'],
+    ['National parks protect areas of natural ___.',['beautiful','beauty','beautifully','beautify'],1,'Sau “of natural” cần danh từ beauty = vẻ đẹp tự nhiên.'],
+    ['Many people enjoy ___ along public footpaths.',['walk','walking','to walking','walked'],1,'Enjoy + V-ing nên dùng walking.'],
+    ['The coastline is often ___.',['wild','wildly','wilderness','wilder than'],0,'Sau linking verb is cần tính từ wild để mô tả coastline.'],
+    ['Most farmland ___ by individuals.',['owns','is owned','owned','is owning'],1,'Câu bị động hiện tại: is owned by = được sở hữu bởi.'],
+    ['The government is responsible ___ public footpaths.',['to','for','with','of'],1,'Be responsible for = chịu trách nhiệm về.'],
+    ['We went on a picnic ___ the weather was pleasant.',['because','but','so that','although of'],0,'Because nêu nguyên nhân: đi dã ngoại vì thời tiết dễ chịu.'],
+    ['You should leave ___ litter in a national park.',['no','many','a few','some of'],0,'Leave no litter = không để lại rác; đây là quy tắc bảo vệ môi trường.'],
+    ['Cycling is ___ than driving for the environment.',['good','better','best','more good'],1,'So sánh hơn bất quy tắc của good là better.'],
+    ['People who travel daily to work are called ___.',['commuters','farmers','walkers only','owners'],0,'Commuters là những người thường xuyên đi từ nhà đến nơi làm việc.'],
+    ['There are ___ beautiful lakes in this park.',['much','a little','several','any of'],2,'Lakes là danh từ đếm được số nhiều; several = một vài/nhiều hơn hai.'],
+    ['The path was wet; ___, we continued walking.',['however','therefore','because','so'],0,'However diễn tả sự tương phản: đường ướt nhưng chúng tôi vẫn đi tiếp.'],
+    ['Visitors must ___ the park rules.',['follow','following','to follow','followed'],0,'Sau must dùng động từ nguyên mẫu follow.'],
+    ['The lake is one of the ___ places in the park.',['peaceful','more peaceful','most peaceful','peacefully'],2,'One of the + tính từ bậc nhất + danh từ số nhiều: one of the most peaceful places.'],
+  ]),
+  6: makeExtras([
+    ['Choose the word whose underlined part is pronounced differently.',['knit','knife','know','kind'],3,'Chữ k câm trong knit, knife, know; chữ k trong kind được phát âm /k/.',['k','k','k','k']],
+    ['Choose the word with a different stress pattern.',['favourite','careful','patient','prepare'],3,'Favourite, careful, patient nhấn âm 1; prepare nhấn âm 2.'],
+    ['My grandmother taught me ___ when I was ten.',['knit','knitting','to knit','knitted'],2,'Teach somebody to V: dạy ai làm gì. Vì vậy dùng to knit.'],
+    ['It took me a week ___ the sweater.',['finish','to finish','finishing','finished'],1,'It takes/took somebody + thời gian + to V. Đáp án là to finish.'],
+    ['Dad said it was ___ favourite sweater.',['he','him','his','himself'],2,'Trước danh từ sweater cần tính từ sở hữu his.'],
+    ['Knitting helps me become more ___.',['patience','patient','patiently','patients'],1,'Sau become dùng tính từ patient = kiên nhẫn.'],
+    ['You need to practise ___ your stitches improve.',['so that','but','although','or'],0,'So that chỉ mục đích/kết quả mong muốn: luyện tập để các mũi đan tiến bộ.'],
+    ['The wool is ___ tight to work with easily.',['too','enough','so that','very enough'],0,'Too + adjective + to V: quá chặt để có thể thao tác dễ dàng.'],
+    ['She found the pattern ___ the Internet.',['in','on','at','by'],1,'Cụm on the Internet = trên Internet.'],
+    ['We sit in front of the TV and ___.',['knit','knits','knitting','knitted'],0,'Hai động từ song song sau chủ ngữ we: sit ... and knit, đều ở hiện tại đơn.'],
+    ['A “pastime” is an activity done for ___.',['pleasure','danger','punishment','work only'],0,'Pastime nghĩa là thú tiêu khiển, hoạt động làm trong thời gian rảnh để vui.'],
+    ['This pattern is ___ than the first one.',['easy','easier','easiest','more easier'],1,'So sánh hơn của easy: đổi y thành i rồi thêm -er → easier.'],
+    ['I have knitted three scarves ___ last month.',['for','since','during of','at'],1,'Since + mốc thời gian; last month là mốc bắt đầu.'],
+    ['If a stitch drops, you ___ fix it patiently.',['should','should to','are should','shoulding'],0,'Should + V nguyên mẫu dùng để đưa lời khuyên: should fix.'],
+    ['Grandma and I ___ the same hobby.',['share','shares','sharing','shared always'],0,'Chủ ngữ số nhiều “Grandma and I” dùng động từ nguyên mẫu share ở hiện tại đơn.'],
+  ]),
+};
+
+export const exams: Exam[] = baseExams.map((exam) => {
+  const language = exam.questions.slice(0, 5);
+  const reading = exam.questions.slice(5).map((item, index) => ({ ...item, id: index + 21 }));
+  return { ...exam, questions: [...language, ...extraSets[exam.id], ...reading] };
+});
