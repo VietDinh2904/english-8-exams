@@ -146,7 +146,8 @@ export default function Home() {
           {([
             ['review', 'Ôn tập'],
             ['survey', 'Khảo sát đầu năm'],
-            ['midterm', 'Đề giữa kỳ'],
+            ['midterm', 'Đề giữa kỳ I'],
+            ['final', 'Đề cuối kỳ I'],
           ] as const).map(([group, label]) => <div key={group}>
             <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.14em] text-slate-400">{label}</p>
             <div className="grid gap-2">{availableExams.map((item, index) => item.menuGroup === group ? renderExamButton(item, index) : null)}</div>

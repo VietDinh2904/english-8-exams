@@ -5,7 +5,7 @@ type Template = Omit<Question, 'id'>;
 const l = (prompt: string, options: string[], answer: number, explanation: string, underlines?: string[]): Template => ({ section: 'Language Focus', prompt, options, answer, explanation, underlines });
 const r = (prompt: string, options: string[], answer: number, explanation: string): Template => ({ section: 'Reading', prompt, options, answer, explanation });
 
-const language: Template[] = [
+export const exam9LanguageBank: Template[] = [
   l('Choose the word whose underlined part is pronounced differently.', ['pottery', 'control', 'fold', 'local'], 0, '“Pottery” /ˈpɒtəri/ có chữ o mang âm /ɒ/; control, fold và local có âm /əʊ/. Vì vậy chọn A.', ['o', 'o', 'o', 'o']),
   l('Choose the word whose underlined ending is pronounced differently.', ['handicrafts', 'collections', 'artisans', 'skills'], 0, 'Đuôi -s trong “handicrafts” đọc /s/ sau âm /t/; ba từ còn lại đọc /z/.', ['s', 's', 's', 's']),
   l('Choose the word whose underlined part is pronounced differently.', ['capsule', 'advent', 'damage', 'rare'], 3, 'Chữ a trong “rare” đọc /eə/; trong capsule, advent và damage đọc /æ/.', ['a', 'a', 'a', 'a']),
@@ -45,9 +45,9 @@ const language: Template[] = [
 ];
 
 const makeQuestions = (languageIndexes: number[], reading: Template[]): Question[] =>
-  [...languageIndexes.map((index) => language[index]), ...reading].map((item, index) => ({ ...item, id: index + 1 }));
+  [...languageIndexes.map((index) => exam9LanguageBank[index]), ...reading].map((item, index) => ({ ...item, id: index + 1 }));
 
-const picks = (start: number) => Array.from({ length: 20 }, (_, index) => (start + index) % language.length);
+const picks = (start: number) => Array.from({ length: 20 }, (_, index) => (start + index) % exam9LanguageBank.length);
 
 export const midtermExams9: Exam[] = [
   {

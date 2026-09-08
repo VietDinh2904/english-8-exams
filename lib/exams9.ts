@@ -1,5 +1,6 @@
 import type { Exam, Question } from './exams';
 import { midtermExams9 } from './exams9-midterm';
+import { finalExams9 } from './exams9-final';
 
 const q = (
   id: number,
@@ -95,4 +96,5 @@ export const exams9: Exam[] = [
     ],
   },
   ...midtermExams9,
+  ...finalExams9,
 ];
