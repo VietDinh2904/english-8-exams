@@ -1,4 +1,5 @@
 import type { Exam, Question } from './exams';
+import { midtermExams9 } from './exams9-midterm';
 
 const q = (
   id: number,
@@ -13,6 +14,8 @@ const q = (
 export const exams9: Exam[] = [
   {
     id: 1,
+    menuLabel: 'Khảo sát đầu năm',
+    menuGroup: 'survey',
     title: 'Khảo sát chất lượng đầu năm · Đề số 1',
     theme: 'Ôn nền tảng lớp 8 → 9',
     passageTitle: 'Understanding volcanoes',
@@ -48,8 +51,11 @@ export const exams9: Exam[] = [
   },
   {
     id: 2,
+    menuLabel: 'Ôn tập Unit 1–3',
+    menuGroup: 'review',
     title: 'Ôn tập giữa học kỳ I · Unit 1–3',
     theme: 'Local community · City life · Healthy teens',
+    sourceNote: 'Bài luyện được chọn lọc và biên soạn lại từ 3 tài liệu VietJack bạn đã gửi: đề giữa kỳ Bắc Ninh, đề cương Unit 1–3 và ngữ pháp Global Success 9.',
     passageTitle: 'A healthier school week',
     passage:
       'At Green Hill School, students have started a programme called “A Healthier School Week”. They walk or cycle to school when possible and bring balanced lunches with fruit and vegetables. After every forty-five minutes of study, they take a short break to stretch and rest their eyes. The school also encourages students to turn off their phones during homework time. On Friday afternoon, local craftspeople visit the school and teach small groups how to make simple products. The programme helps teenagers care for their health while staying connected with their local community.',
@@ -88,4 +94,5 @@ export const exams9: Exam[] = [
       q(25, 'Reading', 'Local craftspeople help students learn simple practical skills.', ['True', 'False'], 0, 'TRUE. Chiều thứ Sáu, thợ thủ công địa phương đến trường và hướng dẫn các nhóm nhỏ làm sản phẩm đơn giản.'),
     ],
   },
+  ...midtermExams9,
 ];

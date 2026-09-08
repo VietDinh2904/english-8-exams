@@ -10,8 +10,11 @@ export type Question = {
 
 export type Exam = {
   id: number;
+  menuLabel?: string;
+  menuGroup?: 'review' | 'survey' | 'midterm';
   title: string;
   theme: string;
+  sourceNote?: string;
   passageTitle: string;
   passage: string;
   questions: Question[];

@@ -130,16 +130,28 @@ export default function Home() {
   const resetExam = () => selectExam(examIndex);
   const toggleFlag = () => setFlagged((items) => items.includes(question.id) ? items.filter((id) => id !== question.id) : [...items, question.id]);
 
+  const renderExamButton = (item: (typeof availableExams)[number], index: number) => (
+    <button key={item.id} onClick={() => selectExam(index)} className={`group rounded-2xl px-3 py-3 text-left transition ${index === examIndex ? 'bg-sky-600 text-white shadow-md shadow-sky-100' : 'bg-sky-50 text-[#15324a] hover:bg-sky-100'}`}>
+      <span className="block font-bold">{grade === 8 ? `Đề số ${item.id}` : item.menuLabel}</span>
+      <span className={`mt-0.5 block text-xs ${index === examIndex ? 'text-sky-100' : 'text-slate-500'}`}>{item.theme}</span>
+    </button>
+  );
+
   const examMenu = (
     <div>
-      <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-sky-700">{grade === 8 ? 'Bộ đề giữa kỳ' : 'Bộ đề lớp 9'}</p>
-      <nav className="grid gap-2">
-        {availableExams.map((item, index) => (
-          <button key={item.id} onClick={() => selectExam(index)} className={`group rounded-2xl px-3 py-3 text-left transition ${index === examIndex ? 'bg-sky-600 text-white shadow-md shadow-sky-100' : 'bg-sky-50 text-[#15324a] hover:bg-sky-100'}`}>
-            <span className="block font-bold">{grade === 8 ? `Đề số ${item.id}` : item.id === 1 ? 'Khảo sát đầu năm' : 'Ôn tập Unit 1–3'}</span><span className={`mt-0.5 block text-xs ${index === examIndex ? 'text-sky-100' : 'text-slate-500'}`}>{item.theme}</span>
-          </button>
-        ))}
-      </nav>
+      <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-sky-700">{grade === 8 ? 'Bộ đề giữa kỳ · English 8' : 'Nội dung · English 9'}</p>
+      {grade === 8 ? <nav className="grid gap-2">{availableExams.map(renderExamButton)}</nav> : (
+        <nav className="grid gap-5">
+          {([
+            ['review', 'Ôn tập'],
+            ['survey', 'Khảo sát đầu năm'],
+            ['midterm', 'Đề giữa kỳ'],
+          ] as const).map(([group, label]) => <div key={group}>
+            <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.14em] text-slate-400">{label}</p>
+            <div className="grid gap-2">{availableExams.map((item, index) => item.menuGroup === group ? renderExamButton(item, index) : null)}</div>
+          </div>)}
+        </nav>
+      )}
     </div>
   );
 
@@ -154,7 +166,7 @@ export default function Home() {
           <div className="flex rounded-2xl border border-sky-100 bg-sky-50 p-1" aria-label="Chọn khối lớp">
             {([8, 9] as GradeLevel[]).map((item) => <button key={item} onClick={() => switchGrade(item)} className={`rounded-xl px-3 py-2 text-sm font-extrabold transition sm:px-5 ${grade === item ? 'bg-sky-600 text-white shadow-sm' : 'text-sky-800 hover:bg-white'}`} aria-pressed={grade === item}>English {item}</button>)}
           </div>
-          <span className="hidden rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800 xl:inline">{grade === 8 ? 'Global Success · Unit 1–3' : '2 mục học · 50 câu'}</span>
+          <span className="hidden rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800 xl:inline">{grade === 8 ? 'Global Success · Unit 1–3' : `${availableExams.length} mục học · ${availableExams.reduce((total, item) => total + item.questions.length, 0)} câu`}</span>
           <Sheet><SheetTrigger render={<Button variant="outline" size="icon" className="lg:hidden" aria-label="Mở danh sách đề" />}><Menu /></SheetTrigger><SheetContent side="left"><SheetTitle className="mb-5">Chọn đề</SheetTitle>{examMenu}</SheetContent></Sheet>
         </div>
       </header>
@@ -164,13 +176,14 @@ export default function Home() {
 
         <section className="min-w-0">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-            <div><p className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-sky-700"><BookOpen className="size-4"/> {question.section}</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{exam.title}</h1></div>
+            <div><p className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-sky-700"><BookOpen className="size-4"/> English {grade} · {question.section}</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{exam.title}</h1></div>
             <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">{isTrueFalseBlock ? `Câu ${exam.questions.indexOf(trueFalseQuestions[0]) + 1}–${exam.questions.indexOf(trueFalseQuestions.at(-1)!) + 1}` : `Câu ${questionIndex + 1}`} / {exam.questions.length}</span>
           </div>
           <div className="mb-5 grid grid-cols-2 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-sm">
             <button onClick={() => switchMode('practice')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'practice' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Luyện tập · Giải ngay</button>
             <button onClick={() => switchMode('test')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'test' ? 'bg-[#123c5a] text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Làm bài test · Chấm sau</button>
           </div>
+          {exam.sourceNote && <p className="mb-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900"><strong>Nguồn ôn tập:</strong> {exam.sourceNote}</p>}
           {exam.reviewNotes && <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
             <summary className="cursor-pointer px-5 py-4 font-bold text-amber-950">Kiến thức cần nhớ trước khi luyện</summary>
             <div className="grid gap-3 border-t border-amber-200 p-4 sm:grid-cols-2">

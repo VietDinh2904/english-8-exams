@@ -1,6 +1,8 @@
 # Vịt Nhỏ English 8 & 9
 
-Website có hai tab English 8 và English 9. Hiện tại gồm 6 đề giữa kỳ lớp 8, 1 đề khảo sát chất lượng đầu năm lớp 9 và 1 mục ôn tập giữa kỳ Unit 1–3; mỗi bài 25 câu, có chế độ luyện tập và làm bài test.
+Website có hai tab English 8 và English 9. English 8 có 6 đề giữa kỳ. English 9 được chia rõ thành 1 mục ôn tập Unit 1–3, 1 đề khảo sát đầu năm và 7 đề giữa kỳ lấy từ bộ PDF Global Success; mỗi bài có 25 câu, không gồm phần nghe, có chế độ luyện tập và làm bài test.
+
+Mục ôn tập English 9 được chọn lọc và biên soạn lại từ ba tài liệu VietJack người dùng đã cung cấp: đề giữa kỳ Bắc Ninh, đề cương ôn Unit 1–3 và tài liệu ngữ pháp Global Success 9. Bảy mục “Đề giữa kỳ” là một nhóm riêng, không nằm trong English 8.
 
 ## Mở website trên GitHub Pages
 
