@@ -251,8 +251,13 @@ const extraSets: Record<number, Question[]> = {
   ]),
 };
 
+export const exam8LanguageBank: Question[] = [
+  ...baseExams.flatMap((exam) => exam.questions.slice(0, 5)),
+  ...Object.values(extraSets).flat(),
+];
+
 export const exams: Exam[] = baseExams.map((exam) => {
   const language = exam.questions.slice(0, 5);
   const reading = exam.questions.slice(5).map((item, index) => ({ ...item, id: index + 21 }));
-  return { ...exam, questions: [...language, ...extraSets[exam.id], ...reading] };
+  return { ...exam, menuLabel: `Giữa kỳ I · Đề ${exam.id}`, menuGroup: 'midterm', questions: [...language, ...extraSets[exam.id], ...reading] };
 });

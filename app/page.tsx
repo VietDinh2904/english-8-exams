@@ -7,7 +7,8 @@ import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { exams as exams8 } from '@/lib/exams';
+import { exams as baseExams8 } from '@/lib/exams';
+import { additionalExams8 } from '@/lib/exams8-content';
 import { exams9 } from '@/lib/exams9';
 import { exams10 } from '@/lib/exams10';
 
@@ -15,6 +16,7 @@ type Answers = Record<number, number>;
 type ExamMode = 'practice' | 'test';
 type GradeLevel = 8 | 9 | 10;
 type ModelContext = { registerTool: (tool: Record<string, unknown>, options?: { signal: AbortSignal }) => void | Promise<void> };
+const exams8 = [...baseExams8, ...additionalExams8];
 
 function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -133,15 +135,25 @@ export default function Home() {
 
   const renderExamButton = (item: (typeof availableExams)[number], index: number) => (
     <button key={item.id} onClick={() => selectExam(index)} className={`group rounded-2xl px-3 py-3 text-left transition ${index === examIndex ? 'bg-sky-600 text-white shadow-md shadow-sky-100' : 'bg-sky-50 text-[#15324a] hover:bg-sky-100'}`}>
-      <span className="block font-bold">{grade === 8 ? `Đề số ${item.id}` : item.menuLabel}</span>
+      <span className="block font-bold">{item.menuLabel ?? `Đề số ${item.id}`}</span>
       <span className={`mt-0.5 block text-xs ${index === examIndex ? 'text-sky-100' : 'text-slate-500'}`}>{item.theme}</span>
     </button>
   );
 
   const examMenu = (
     <div>
-      <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-sky-700">{grade === 8 ? 'Bộ đề giữa kỳ · English 8' : `Nội dung · English ${grade}`}</p>
-      {grade === 8 ? <nav className="grid gap-2">{availableExams.map(renderExamButton)}</nav> : grade === 9 ? (
+      <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-sky-700">Nội dung · English {grade}</p>
+      {grade === 8 ? <nav className="grid gap-5">
+        {([
+          ['unit', 'Học theo Unit'],
+          ['midterm', 'Đề giữa kỳ I'],
+          ['review', 'Ôn tập cuối kỳ I'],
+          ['final', 'Đề cuối kỳ I'],
+        ] as const).map(([group, label]) => <div key={group}>
+          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.14em] text-slate-400">{label}</p>
+          <div className="grid gap-2">{availableExams.map((item, index) => item.menuGroup === group ? renderExamButton(item, index) : null)}</div>
+        </div>)}
+      </nav> : grade === 9 ? (
         <nav className="grid gap-5">
           {([
             ['review', 'Ôn tập'],
