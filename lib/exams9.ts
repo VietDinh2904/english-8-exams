@@ -1,6 +1,7 @@
 import type { Exam, Question } from './exams';
 import { midtermExams9 } from './exams9-midterm';
 import { finalExams9 } from './exams9-final';
+import { unitExams9 } from './exams9-units';
 
 const q = (
   id: number,
@@ -13,6 +14,7 @@ const q = (
 ): Question => ({ id, section, prompt, options, answer, explanation, underlines });
 
 export const exams9: Exam[] = [
+  ...unitExams9,
   {
     id: 1,
     menuLabel: 'Khảo sát đầu năm',

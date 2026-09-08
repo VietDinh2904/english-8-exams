@@ -196,6 +196,7 @@ export default function Home() {
 
   const menuGroups: [MenuGroup, string][] = grade === 9
     ? [
+        ['unit', 'Học theo Unit'],
         ['review', 'Ôn tập'],
         ['survey', 'Khảo sát đầu năm'],
         ['midterm', 'Đề giữa kỳ I'],
