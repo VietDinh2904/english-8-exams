@@ -1,4 +1,5 @@
 import type { Exam, Question } from './exams';
+import { semesterOneExams10 } from './exams10-semester1';
 
 const q = (id: number, prompt: string, options: string[], answer: number, explanation: string, underlines?: string[]): Question => ({
   id,
@@ -261,4 +262,5 @@ export const exams10: Exam[] = [
       q(25, 'Choose the word with a different stress pattern.', ['successful', 'important', 'effective', 'excellent'], 3, 'Successful, important và effective nhấn âm hai; excellent nhấn âm đầu.'),
     ],
   },
+  ...semesterOneExams10,
 ];

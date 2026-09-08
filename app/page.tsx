@@ -152,7 +152,17 @@ export default function Home() {
             <div className="grid gap-2">{availableExams.map((item, index) => item.menuGroup === group ? renderExamButton(item, index) : null)}</div>
           </div>)}
         </nav>
-      ) : <nav className="grid gap-2">{availableExams.map(renderExamButton)}</nav>}
+      ) : <nav className="grid gap-5">
+        {([
+          ['unit', 'Học theo Unit'],
+          ['midterm', 'Đề giữa kỳ I'],
+          ['review', 'Ôn tập cuối kỳ I'],
+          ['final', 'Đề cuối kỳ I'],
+        ] as const).map(([group, label]) => <div key={group}>
+          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.14em] text-slate-400">{label}</p>
+          <div className="grid gap-2">{availableExams.map((item, index) => item.menuGroup === group ? renderExamButton(item, index) : null)}</div>
+        </div>)}
+      </nav>}
     </div>
   );
 

@@ -11,7 +11,7 @@ export type Question = {
 export type Exam = {
   id: number;
   menuLabel?: string;
-  menuGroup?: 'review' | 'survey' | 'midterm' | 'unit';
+  menuGroup?: 'review' | 'survey' | 'midterm' | 'final' | 'unit';
   title: string;
   theme: string;
   sourceNote?: string;
