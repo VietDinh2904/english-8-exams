@@ -9,10 +9,11 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { exams as exams8 } from '@/lib/exams';
 import { exams9 } from '@/lib/exams9';
+import { exams10 } from '@/lib/exams10';
 
 type Answers = Record<number, number>;
 type ExamMode = 'practice' | 'test';
-type GradeLevel = 8 | 9;
+type GradeLevel = 8 | 9 | 10;
 type ModelContext = { registerTool: (tool: Record<string, unknown>, options?: { signal: AbortSignal }) => void | Promise<void> };
 
 function formatTime(seconds: number) {
@@ -37,7 +38,7 @@ export default function Home() {
   const [flagged, setFlagged] = useState<number[]>([]);
   const [secondsLeft, setSecondsLeft] = useState(60 * 60);
   const [submitted, setSubmitted] = useState(false);
-  const availableExams = grade === 8 ? exams8 : exams9;
+  const availableExams = grade === 8 ? exams8 : grade === 9 ? exams9 : exams10;
   const exam = availableExams[examIndex];
   const question = exam.questions[questionIndex];
   const selected = answers[question.id];
@@ -139,8 +140,8 @@ export default function Home() {
 
   const examMenu = (
     <div>
-      <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-sky-700">{grade === 8 ? 'Bộ đề giữa kỳ · English 8' : 'Nội dung · English 9'}</p>
-      {grade === 8 ? <nav className="grid gap-2">{availableExams.map(renderExamButton)}</nav> : (
+      <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-sky-700">{grade === 8 ? 'Bộ đề giữa kỳ · English 8' : `Nội dung · English ${grade}`}</p>
+      {grade === 8 ? <nav className="grid gap-2">{availableExams.map(renderExamButton)}</nav> : grade === 9 ? (
         <nav className="grid gap-5">
           {([
             ['review', 'Ôn tập'],
@@ -151,7 +152,7 @@ export default function Home() {
             <div className="grid gap-2">{availableExams.map((item, index) => item.menuGroup === group ? renderExamButton(item, index) : null)}</div>
           </div>)}
         </nav>
-      )}
+      ) : <nav className="grid gap-2">{availableExams.map(renderExamButton)}</nav>}
     </div>
   );
 
@@ -160,11 +161,11 @@ export default function Home() {
       <header className="sticky top-0 z-30 border-b border-sky-100 bg-white/92 px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <img src={grade === 8 ? 'duck-grade8-reading.png' : 'duck-grade9-explorer.png'} alt={`Mascot vịt vàng English ${grade}`} className="h-12 w-12 rounded-xl object-cover object-top" />
-            <div><strong className="block text-lg leading-tight">Vịt Nhỏ English {grade}</strong><span className="hidden text-sm text-slate-500 sm:block">{grade === 8 ? 'Ôn giữa kỳ thật nhẹ nhàng' : 'Vững nền tảng, tự tin vào lớp 9'}</span></div>
+            <img src={grade === 8 ? 'duck-grade8-reading.png' : grade === 9 ? 'duck-grade9-explorer.png' : 'duck-learn.png'} alt={`Mascot vịt vàng English ${grade}`} className="h-12 w-12 rounded-xl object-cover object-top" />
+            <div><strong className="block text-lg leading-tight">Vịt Nhỏ English {grade}</strong><span className="hidden text-sm text-slate-500 sm:block">{grade === 8 ? 'Ôn giữa kỳ thật nhẹ nhàng' : grade === 9 ? 'Vững nền tảng, tự tin vào lớp 9' : 'Học chắc từng Unit, tiến bộ mỗi ngày'}</span></div>
           </div>
           <div className="flex rounded-2xl border border-sky-100 bg-sky-50 p-1" aria-label="Chọn khối lớp">
-            {([8, 9] as GradeLevel[]).map((item) => <button key={item} onClick={() => switchGrade(item)} className={`rounded-xl px-3 py-2 text-sm font-extrabold transition sm:px-5 ${grade === item ? 'bg-sky-600 text-white shadow-sm' : 'text-sky-800 hover:bg-white'}`} aria-pressed={grade === item}>English {item}</button>)}
+            {([8, 9, 10] as GradeLevel[]).map((item) => <button key={item} onClick={() => switchGrade(item)} className={`rounded-xl px-2.5 py-2 text-sm font-extrabold transition sm:px-4 ${grade === item ? 'bg-sky-600 text-white shadow-sm' : 'text-sky-800 hover:bg-white'}`} aria-pressed={grade === item}>English {item}</button>)}
           </div>
           <span className="hidden rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800 xl:inline">{grade === 8 ? 'Global Success · Unit 1–3' : `${availableExams.length} mục học · ${availableExams.reduce((total, item) => total + item.questions.length, 0)} câu`}</span>
           <Sheet><SheetTrigger render={<Button variant="outline" size="icon" className="lg:hidden" aria-label="Mở danh sách đề" />}><Menu /></SheetTrigger><SheetContent side="left"><SheetTitle className="mb-5">Chọn đề</SheetTitle>{examMenu}</SheetContent></Sheet>
@@ -198,7 +199,7 @@ export default function Home() {
 
           {submitted ? (
             <article className="overflow-hidden rounded-[28px] border border-sky-100 bg-white text-center shadow-[0_16px_50px_rgba(24,95,140,.08)]">
-              <div className="bg-sky-600 px-6 py-8 text-white"><img src="duck-celebrate.png" alt="Vịt nhỏ chúc mừng" className="mx-auto h-36 w-36 object-contain drop-shadow-lg"/><p className="mt-2 text-sm font-bold uppercase tracking-[.18em] text-sky-100">Đã hoàn thành English {grade} · Đề {exam.id}</p><h2 className="mt-2 text-4xl font-extrabold">{score}/{exam.questions.length} câu đúng</h2></div>
+              <div className="bg-sky-600 px-6 py-8 text-white"><img src="duck-celebrate.png" alt="Vịt nhỏ chúc mừng" className="mx-auto h-36 w-36 object-contain drop-shadow-lg"/><p className="mt-2 text-sm font-bold uppercase tracking-[.18em] text-sky-100">Đã hoàn thành English {grade} · {exam.menuLabel ?? `Đề ${exam.id}`}</p><h2 className="mt-2 text-4xl font-extrabold">{score}/{exam.questions.length} câu đúng</h2></div>
               <div className="p-7">
                 <p className="text-lg text-slate-600">{score >= 20 ? 'Xuất sắc! Vịt Nhỏ thấy bạn đã nắm bài rất chắc.' : score >= 15 ? 'Làm tốt lắm! Xem lại vài câu sai là bạn sẽ tiến bộ nhanh.' : 'Mình cùng xem lại đáp án rồi thử lần nữa nhé.'}</p>
                 <div className="mt-7 space-y-3 text-left">

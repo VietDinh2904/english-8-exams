@@ -1,6 +1,8 @@
-# Vịt Nhỏ English 8 & 9
+# Vịt Nhỏ English 8, 9 & 10
 
-Website có hai tab English 8 và English 9. English 8 có 6 đề giữa kỳ. English 9 được chia rõ thành 1 mục ôn tập Unit 1–3, 1 đề khảo sát đầu năm và 7 đề giữa kỳ lấy từ bộ PDF Global Success; mỗi bài có 25 câu, không gồm phần nghe, có chế độ luyện tập và làm bài test.
+Website có ba tab English 8, English 9 và English 10. English 8 có 6 đề giữa kỳ. English 9 được chia rõ thành 1 mục ôn tập Unit 1–3, 1 đề khảo sát đầu năm và 7 đề giữa kỳ lấy từ bộ PDF Global Success; mỗi bài có 25 câu, không gồm phần nghe, có chế độ luyện tập và làm bài test.
+
+English 10 hiện có bản mẫu Unit 1 · Family Life gồm 25 câu: 10 câu từ vựng, 10 câu hiện tại đơn/hiện tại tiếp diễn và 5 câu phát âm /br/, /kr/, /tr/. Câu hỏi được biên soạn lại theo các chủ điểm công khai, không sao chép nguyên văn ngân hàng bài tập.
 
 Mục ôn tập English 9 được chọn lọc và biên soạn lại từ ba tài liệu VietJack người dùng đã cung cấp: đề giữa kỳ Bắc Ninh, đề cương ôn Unit 1–3 và tài liệu ngữ pháp Global Success 9. Bảy mục “Đề giữa kỳ” là một nhóm riêng, không nằm trong English 8.
 
