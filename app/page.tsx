@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { BookOpen, Check, ChevronLeft, ChevronRight, Clock3, Flag, Languages, Menu, RefreshCw, RotateCcw, Sparkles, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Flag, Languages, Menu, RefreshCw, RotateCcw, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { exams as baseExams8, type Question } from '@/lib/exams';
+import { exams as baseExams8, type Exam, type Question } from '@/lib/exams';
 import { additionalExams8 } from '@/lib/exams8-content';
 import { exams9 } from '@/lib/exams9';
 import { exams10 } from '@/lib/exams10';
@@ -16,6 +16,7 @@ import { vocabularyByGrade, type VocabularyItem } from '@/lib/vocabulary';
 type Answers = Record<number, number>;
 type ExamMode = 'practice' | 'test';
 type GradeLevel = 8 | 9 | 10;
+type MenuGroup = NonNullable<Exam['menuGroup']>;
 type ModelContext = { registerTool: (tool: Record<string, unknown>, options?: { signal: AbortSignal }) => void | Promise<void> };
 type DictionaryState = { word: string; translation: string; status: 'loading' | 'ready' | 'error' | 'empty'; x: number; y: number };
 const exams8 = [...baseExams8, ...additionalExams8];
@@ -193,42 +194,45 @@ export default function Home() {
     </button>
   );
 
+  const menuGroups: [MenuGroup, string][] = grade === 9
+    ? [
+        ['review', 'Ôn tập'],
+        ['survey', 'Khảo sát đầu năm'],
+        ['midterm', 'Đề giữa kỳ I'],
+        ['final', 'Đề cuối kỳ I'],
+      ]
+    : [
+        ['unit', 'Học theo Unit'],
+        ['midterm', 'Đề giữa kỳ I'],
+        ['review', 'Ôn tập cuối kỳ I'],
+        ['final', 'Đề cuối kỳ I'],
+      ];
+
   const examMenu = (
     <div>
       <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-sky-700">Nội dung · English {grade}</p>
-      {grade === 8 ? <nav className="grid gap-5">
-        {([
-          ['unit', 'Học theo Unit'],
-          ['midterm', 'Đề giữa kỳ I'],
-          ['review', 'Ôn tập cuối kỳ I'],
-          ['final', 'Đề cuối kỳ I'],
-        ] as const).map(([group, label]) => <div key={group}>
-          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.14em] text-slate-400">{label}</p>
-          <div className="grid gap-2">{availableExams.map((item, index) => item.menuGroup === group ? renderExamButton(item, index) : null)}</div>
-        </div>)}
-      </nav> : grade === 9 ? (
-        <nav className="grid gap-5">
-          {([
-            ['review', 'Ôn tập'],
-            ['survey', 'Khảo sát đầu năm'],
-            ['midterm', 'Đề giữa kỳ I'],
-            ['final', 'Đề cuối kỳ I'],
-          ] as const).map(([group, label]) => <div key={group}>
-            <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.14em] text-slate-400">{label}</p>
-            <div className="grid gap-2">{availableExams.map((item, index) => item.menuGroup === group ? renderExamButton(item, index) : null)}</div>
-          </div>)}
-        </nav>
-      ) : <nav className="grid gap-5">
-        {([
-          ['unit', 'Học theo Unit'],
-          ['midterm', 'Đề giữa kỳ I'],
-          ['review', 'Ôn tập cuối kỳ I'],
-          ['final', 'Đề cuối kỳ I'],
-        ] as const).map(([group, label]) => <div key={group}>
-          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[.14em] text-slate-400">{label}</p>
-          <div className="grid gap-2">{availableExams.map((item, index) => item.menuGroup === group ? renderExamButton(item, index) : null)}</div>
-        </div>)}
-      </nav>}
+      <nav className="grid gap-3">
+        {menuGroups.map(([group, label]) => {
+          const groupItems = availableExams
+            .map((item, index) => ({ item, index }))
+            .filter(({ item }) => item.menuGroup === group);
+
+          if (groupItems.length === 0) return null;
+
+          return <details key={`${grade}-${group}`} className="group overflow-hidden rounded-2xl border border-sky-100 bg-white shadow-sm">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-sky-50 px-3 py-3 font-bold text-sky-900 transition hover:bg-sky-100 [&::-webkit-details-marker]:hidden">
+              <span>{label}</span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-sky-700">{groupItems.length}</span>
+                <ChevronDown className="size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </span>
+            </summary>
+            <div className="grid gap-2 border-t border-sky-100 p-2">
+              {groupItems.map(({ item, index }) => renderExamButton(item, index))}
+            </div>
+          </details>;
+        })}
+      </nav>
     </div>
   );
 
