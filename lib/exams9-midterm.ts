@@ -6,7 +6,7 @@ const l = (prompt: string, options: string[], answer: number, explanation: strin
 const r = (prompt: string, options: string[], answer: number, explanation: string): Template => ({ section: 'Reading', prompt, options, answer, explanation });
 
 export const exam9LanguageBank: Template[] = [
-  l('Choose the word whose underlined part is pronounced differently.', ['pottery', 'control', 'fold', 'local'], 0, '“Pottery” /ˈpɒtəri/ có chữ o mang âm /ɒ/; control, fold và local có âm /əʊ/. Vì vậy chọn A.', ['o', 'o', 'o', 'o']),
+  l('Choose the word whose underlined part is pronounced differently.', ['pottery', 'control', 'fold', 'local'], 0, '“Pottery” /ˈpɒtəri/ có chữ o mang âm /ɒ/; control, fold và local có âm /əʊ/. Vì vậy chọn “pottery”.', ['o', 'o', 'o', 'o']),
   l('Choose the word whose underlined ending is pronounced differently.', ['handicrafts', 'collections', 'artisans', 'skills'], 0, 'Đuôi -s trong “handicrafts” đọc /s/ sau âm /t/; ba từ còn lại đọc /z/.', ['s', 's', 's', 's']),
   l('Choose the word whose underlined part is pronounced differently.', ['capsule', 'advent', 'damage', 'rare'], 3, 'Chữ a trong “rare” đọc /eə/; trong capsule, advent và damage đọc /æ/.', ['a', 'a', 'a', 'a']),
   l('Choose the word whose underlined part is pronounced differently.', ['bother', 'worth', 'without', 'together'], 1, '“Worth” có th vô thanh /θ/; bother, without và together dùng âm hữu thanh /ð/ trong cách đọc của bài.', ['th', 'th', 'th', 'th']),
@@ -67,7 +67,7 @@ export const midtermExams9: Exam[] = [
     passageTitle: 'Carpet weaving in Etrim',
     passage: 'Etrim, a village near Bodrum in Turkey, is known for carpet weaving. Each spring, villagers shear sheep, clean the wool, spin it into yarn and colour it with natural dyes. Weavers tie knots on traditional looms without following a fixed pattern; they rely on memory, so each carpet is unique. A carpet may take about two months to finish. The artisans are proud that their work keeps an old tradition alive.',
     questions: makeQuestions(picks(5), [
-      r('What is the best title?', ['Modern factories in Turkey', 'Carpet weaving in Etrim', 'Sheep farming worldwide', 'A two-day village tour'], 1, 'Tiêu đề B bao quát địa điểm, nghề thủ công và toàn bộ nội dung bài.'),
+      r('What is the best title?', ['Modern factories in Turkey', 'Carpet weaving in Etrim', 'Sheep farming worldwide', 'A two-day village tour'], 1, 'Tiêu đề “Carpet weaving in Etrim” bao quát địa điểm, nghề thủ công và toàn bộ nội dung bài.'),
       r('What happens after villagers clean the wool?', ['They sell it immediately', 'They spin it into yarn', 'They make a fixed pattern', 'They import a carpet'], 1, 'Trình tự trong bài: shear → clean → spin into yarn → dye.'),
       r('Why is each carpet unique?', ['It is made in a factory', 'It uses plastic thread', 'Weavers rely on memory', 'Visitors design it'], 2, 'Người thợ không theo mẫu cố định mà dựa vào trí nhớ, vì thế mỗi tấm thảm khác nhau.'),
       r('How long may a carpet take to complete?', ['About two days', 'About two weeks', 'About two months', 'About two years'], 2, 'Chi tiết thời gian được nêu trực tiếp là khoảng hai tháng.'),

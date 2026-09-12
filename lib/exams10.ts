@@ -50,7 +50,7 @@ export const exams10: Exam[] = [
       q(19, 'Normally Minh cooks, but today his sister ___ dinner.', ['makes', 'is making', 'make', 'made'], 1, '“Today” diễn tả sự thay đổi tạm thời so với thói quen “normally”, nên dùng hiện tại tiếp diễn.'),
       q(20, 'Our school bus ___ at 6:45 every morning.', ['is leaving', 'leave', 'leaves', 'leaving'], 2, 'Lịch trình cố định dùng hiện tại đơn. Chủ ngữ “bus” là số ít nên dùng “leaves”.'),
 
-      q(21, 'Choose the word whose underlined part is pronounced differently.', ['bread', 'breakfast', 'brown', 'climb'], 3, 'Bread, breakfast và brown bắt đầu bằng cụm /br/. “Climb” bắt đầu bằng /kl/, nên chọn D.', ['br', 'br', 'br', 'cl']),
+      q(21, 'Choose the word whose underlined part is pronounced differently.', ['bread', 'breakfast', 'brown', 'climb'], 3, 'Bread, breakfast và brown bắt đầu bằng cụm /br/. “Climb” bắt đầu bằng /kl/, nên chọn “climb”.', ['br', 'br', 'br', 'cl']),
       q(22, 'Choose the word whose underlined part is pronounced differently.', ['cream', 'crane', 'create', 'brush'], 3, 'Cream, crane và create bắt đầu bằng /kr/. “Brush” bắt đầu bằng /br/.', ['cr', 'cr', 'cr', 'br']),
       q(23, 'Choose the word whose underlined part is pronounced differently.', ['tree', 'train', 'treat', 'cream'], 3, 'Tree, train và treat bắt đầu bằng /tr/. “Cream” bắt đầu bằng /kr/.', ['tr', 'tr', 'tr', 'cr']),
       q(24, 'Which word begins with the /br/ sound?', ['crowd', 'brother', 'train', 'clean'], 1, '“Brother” /ˈbrʌðə/ bắt đầu bằng cụm phụ âm /br/. Các từ còn lại lần lượt bắt đầu bằng /kr/, /tr/ và /kl/.', ['cr', 'br', 'tr', 'cl']),

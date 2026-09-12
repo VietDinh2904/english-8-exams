@@ -12,6 +12,8 @@ import { additionalExams8 } from '@/lib/exams8-content';
 import { exams9 } from '@/lib/exams9';
 import { exams10 } from '@/lib/exams10';
 import { vocabularyByGrade, type VocabularyItem } from '@/lib/vocabulary';
+import { distributeAnswers, distributeExams } from '@/lib/answer-distribution';
+import { GrammarLesson9 } from '@/components/grammar-lesson9';
 
 type Answers = Record<number, number>;
 type ExamMode = 'practice' | 'test';
@@ -19,7 +21,9 @@ type GradeLevel = 8 | 9 | 10;
 type MenuGroup = NonNullable<Exam['menuGroup']>;
 type ModelContext = { registerTool: (tool: Record<string, unknown>, options?: { signal: AbortSignal }) => void | Promise<void> };
 type DictionaryState = { word: string; translation: string; status: 'loading' | 'ready' | 'error' | 'empty'; x: number; y: number };
-const exams8 = [...baseExams8, ...additionalExams8];
+const exams8 = distributeExams([...baseExams8, ...additionalExams8]);
+const balancedExams9 = distributeExams(exams9);
+const balancedExams10 = distributeExams(exams10);
 
 function buildTestQuestions(examQuestions: Question[], allExams: { questions: Question[] }[], examIndex: number) {
   const chosen = [...examQuestions];
@@ -33,7 +37,7 @@ function buildTestQuestions(examQuestions: Question[], allExams: { questions: Qu
     }
     if (chosen.length === 40) break;
   }
-  return chosen.slice(0, 40).map((item, index) => ({ ...item, id: index + 1 }));
+  return distributeAnswers(chosen.slice(0, 40).map((item, index) => ({ ...item, id: index + 1 })), `test|${examIndex}`);
 }
 
 function randomVocabulary(grade: GradeLevel): VocabularyItem[] {
@@ -64,7 +68,7 @@ export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const [vocabulary, setVocabulary] = useState<VocabularyItem[]>([]);
   const [dictionary, setDictionary] = useState<DictionaryState | null>(null);
-  const availableExams = grade === 8 ? exams8 : grade === 9 ? exams9 : exams10;
+  const availableExams = grade === 8 ? exams8 : grade === 9 ? balancedExams9 : balancedExams10;
   const exam = availableExams[examIndex];
   const questions = useMemo(() => mode === 'test' ? buildTestQuestions(exam.questions, availableExams, examIndex) : exam.questions, [availableExams, exam, examIndex, mode]);
   const question = questions[questionIndex];
@@ -270,7 +274,8 @@ export default function Home() {
             <button onClick={() => switchMode('test')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'test' ? 'bg-[#123c5a] text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Làm bài test</button>
           </div>
           {exam.sourceNote && <p className="mb-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900"><strong>Nguồn ôn tập:</strong> {exam.sourceNote}</p>}
-          {exam.reviewNotes && <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
+          {grade === 9 && exam.menuGroup === 'unit' && (mode === 'practice' || submitted) && <GrammarLesson9 key={exam.id} unit={exam.id - 100} />}
+          {exam.reviewNotes && !(grade === 9 && exam.menuGroup === 'unit') && <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
             <summary className="cursor-pointer px-5 py-4 font-bold text-amber-950">Kiến thức cần nhớ trước khi luyện</summary>
             <div className="grid gap-3 border-t border-amber-200 p-4 sm:grid-cols-2">
               {exam.reviewNotes.map((note) => <div key={note.title} className="rounded-2xl bg-white p-4 shadow-sm">
