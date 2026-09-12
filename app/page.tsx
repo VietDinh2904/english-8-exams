@@ -66,6 +66,7 @@ export default function Home() {
   const [examIndex, setExamIndex] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
+  const [wrongAttempts, setWrongAttempts] = useState<Record<number, number[]>>({});
   const [flagged, setFlagged] = useState<number[]>([]);
   const [secondsLeft, setSecondsLeft] = useState(60 * 60);
   const [submitted, setSubmitted] = useState(false);
@@ -80,14 +81,13 @@ export default function Home() {
   const question = questions[questionIndex];
   const selected = answers[question.id];
   const isAnswered = selected !== undefined;
-  const isCorrect = selected === question.answer;
-  const trueFalseQuestions = questions.filter((item) => item.section === 'Reading' && item.options.length === 2 && item.options[0] === 'True' && item.options[1] === 'False');
-  const isTrueFalseBlock = trueFalseQuestions.some((item) => item.id === question.id);
+  const isTrueFalseQuestion = question.section === 'Reading' && question.options.length === 2 && question.options[0] === 'True' && question.options[1] === 'False';
+  const triedWrong = wrongAttempts[question.id] ?? [];
+  const firstUnansweredIndex = questions.findIndex((item) => answers[item.id] === undefined);
 
   const score = useMemo(() => questions.filter((item) => answers[item.id] === item.answer).length, [answers, questions]);
   const answeredCount = Object.keys(answers).length;
-  const feedbackVisible = mode === 'practice' || submitted;
-  const canSubmit = mode === 'test' ? answeredCount === questions.length : answeredCount > 0;
+  const canSubmit = answeredCount === questions.length;
 
   useEffect(() => {
     if (mode !== 'test' || submitted || secondsLeft <= 0) return;
@@ -103,6 +103,7 @@ export default function Home() {
     setExamIndex(index);
     setQuestionIndex(0);
     setAnswers({});
+    setWrongAttempts({});
     setFlagged([]);
     setSubmitted(false);
     setSecondsLeft(60 * 60);
@@ -114,6 +115,7 @@ export default function Home() {
     setExamIndex(0);
     setQuestionIndex(0);
     setAnswers({});
+    setWrongAttempts({});
     setFlagged([]);
     setSubmitted(false);
     setSecondsLeft(60 * 60);
@@ -124,6 +126,7 @@ export default function Home() {
     setMode(nextMode);
     setQuestionIndex(0);
     setAnswers({});
+    setWrongAttempts({});
     setFlagged([]);
     setSubmitted(false);
     setSecondsLeft(60 * 60);
@@ -131,8 +134,18 @@ export default function Home() {
   };
 
   const chooseAnswer = useCallback((value: number) => {
-    setAnswers((current) => ({ ...current, [questions[questionIndex].id]: value }));
-  }, [questions, questionIndex]);
+    const currentQuestion = questions[questionIndex];
+    if (mode === 'test') {
+      setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
+      return;
+    }
+    if (answers[currentQuestion.id] !== undefined || (wrongAttempts[currentQuestion.id] ?? []).includes(value)) return;
+    if (value === currentQuestion.answer) {
+      setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
+    } else {
+      setWrongAttempts((current) => ({ ...current, [currentQuestion.id]: [...(current[currentQuestion.id] ?? []), value] }));
+    }
+  }, [answers, mode, questionIndex, questions, wrongAttempts]);
 
   const openDictionary = async (event: ReactMouseEvent<HTMLElement>) => {
     if (mode !== 'practice') return;
@@ -179,7 +192,7 @@ export default function Home() {
       void Promise.resolve(context.registerTool({
         name: 'answer_current_question',
         title: 'Trả lời câu hiện tại',
-        description: 'Chọn đáp án theo số thứ tự (1–4) cho câu hỏi đang hiển thị và trả lại kết quả đúng/sai.',
+        description: 'Chọn đáp án theo số thứ tự (1–4) cho câu hỏi đang hiển thị. Khi luyện tập, đáp án sai bị khóa và cần thử phương án khác.',
         inputSchema: { type: 'object', properties: { optionNumber: { type: 'integer', minimum: 1, maximum: 4 } }, required: ['optionNumber'], additionalProperties: false },
         annotations: { readOnlyHint: false, untrustedContentHint: false },
         execute(input: unknown) {
@@ -187,7 +200,7 @@ export default function Home() {
           if (!Number.isInteger(value) || !value || value < 1 || value > question.options.length) throw new Error(`optionNumber must be from 1 to ${question.options.length}`);
           chooseAnswer(value - 1);
           return mode === 'practice'
-            ? { question: question.id, correct: value - 1 === question.answer, correctOptionNumber: question.answer + 1 }
+            ? { question: question.id, correct: value - 1 === question.answer, status: value - 1 === question.answer ? 'completed' : 'retry' }
             : { question: question.id, status: 'recorded' };
         },
       }, { signal: lifecycle.signal })).catch(report);
@@ -269,11 +282,11 @@ export default function Home() {
         <section className="min-w-0" onContextMenu={openDictionary}>
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div><p className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-sky-700"><BookOpen className="size-4"/> English {grade} · {question.section}</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{exam.title}</h1></div>
-            <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">{isTrueFalseBlock ? `Câu ${questions.indexOf(trueFalseQuestions[0]) + 1}–${questions.indexOf(trueFalseQuestions.at(-1)!) + 1}` : `Câu ${questionIndex + 1}`} / {questions.length}</span>
+            <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">Câu {questionIndex + 1} / {questions.length}</span>
           </div>
           <div className="mb-3 grid gap-2 text-sm sm:grid-cols-2">
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-950"><strong>Luyện tập:</strong> không giới hạn thời gian; đáp án và hướng dẫn xuất hiện sau khi chọn. Bôi đen tiếng Anh rồi nhấp chuột phải để dịch.</div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700"><strong>Làm bài test:</strong> 40 câu trong 60 phút; làm đủ và nộp bài mới xem kết quả.</div>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-950"><strong>Luyện tập:</strong> mỗi lần một câu, không giới hạn thời gian. Chọn sai thì phương án đó bị khóa; thử tiếp đến khi đúng rồi xem lời giải. Bôi đen tiếng Anh và nhấp chuột phải để dịch.</div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700"><strong>Làm bài test:</strong> mỗi lần một câu; 40 câu trong 60 phút. Làm đủ và nộp bài mới xem đáp án, lời giải.</div>
           </div>
           <div className="mb-5 grid grid-cols-2 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-sm">
             <button onClick={() => switchMode('practice')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'practice' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Luyện tập</button>
@@ -320,24 +333,29 @@ export default function Home() {
             <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_16px_50px_rgba(24,95,140,.08)] sm:p-8">
               <div className="mb-5 flex items-center justify-between gap-3"><span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">{question.section === 'Reading' ? `Bài đọc · ${exam.passageTitle}` : 'Ngữ âm · Từ vựng · Ngữ pháp'}</span><button onClick={toggleFlag} className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${flagged.includes(question.id) ? 'bg-amber-100 text-amber-800' : 'text-slate-500 hover:bg-slate-50'}`}><Flag className="size-4" fill={flagged.includes(question.id) ? 'currentColor' : 'none'}/> {flagged.includes(question.id) ? 'Đã đánh dấu' : 'Đánh dấu'}</button></div>
               {question.section === 'Reading' && <div className="mb-6 max-h-52 overflow-y-auto rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-[15px] leading-7 text-slate-700"><strong className="mb-2 block text-amber-900">{exam.passageTitle}</strong>{exam.passage}</div>}
-              {isTrueFalseBlock ? (
+              {isTrueFalseQuestion ? (
                 <div>
-                  <p className="mb-4 text-lg font-semibold">Decide whether each statement is True or False.</p>
+                  <p className="mb-4 text-lg font-semibold">Chọn True hoặc False cho câu nhận định này.</p>
                   <div className="overflow-hidden rounded-2xl border border-slate-200">
                     <Table>
                       <TableHeader><TableRow className="bg-[#123c5a] hover:bg-[#123c5a]"><TableHead className="w-full min-w-64 text-white">Câu nhận định</TableHead><TableHead className="w-24 text-center text-white">True</TableHead><TableHead className="w-24 text-center text-white">False</TableHead></TableRow></TableHeader>
-                      <TableBody>{trueFalseQuestions.map((item, rowIndex) => {
-                        const rowAnswer = answers[item.id];
-                        const rowAnswered = rowAnswer !== undefined;
-                        const rowCorrect = rowAnswer === item.answer;
-                        return <TableRow key={item.id} className={rowAnswered && feedbackVisible ? rowCorrect ? 'bg-emerald-50/60' : 'bg-rose-50/70' : ''}>
-                          <TableCell className="whitespace-normal py-4 align-top text-base font-medium"><span className="mr-2 font-bold">{questions.indexOf(item) + 1}.</span>{item.prompt}{rowAnswered && feedbackVisible && <div className={`mt-3 rounded-xl p-3 text-sm font-normal leading-relaxed ${rowCorrect ? 'bg-emerald-100/70 text-emerald-900' : 'bg-rose-100/80 text-rose-900'}`}><strong>{rowCorrect ? 'Chính xác. ' : `Chưa đúng — đáp án là ${item.options[item.answer]}. `}</strong>{item.explanation}</div>}</TableCell>
-                          {[0,1].map((value) => <TableCell key={value} className="text-center align-top"><button onClick={() => setAnswers((current) => ({ ...current, [item.id]: value }))} aria-label={`Câu ${rowIndex + 1}: chọn ${value === 0 ? 'True' : 'False'}`} aria-pressed={rowAnswer === value} className={`mx-auto grid h-10 w-10 place-items-center rounded-full border-2 transition ${rowAnswer === value ? feedbackVisible ? value === item.answer ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-rose-500 bg-rose-500 text-white' : 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 bg-white hover:border-sky-500'}`}>{rowAnswer === value && (feedbackVisible ? value === item.answer ? <Check className="size-5"/> : <X className="size-5"/> : <Check className="size-5"/>)}</button></TableCell>)}
-                        </TableRow>;
-                      })}</TableBody>
+                      <TableBody><TableRow className={mode === 'practice' && isAnswered ? 'bg-emerald-50/60' : ''}>
+                        <TableCell className="whitespace-normal py-4 align-top text-base font-medium"><span className="mr-2 font-bold">{questionIndex + 1}.</span>{question.prompt}</TableCell>
+                        {[0, 1].map((value) => {
+                          const wasWrong = mode === 'practice' && triedWrong.includes(value);
+                          const chosen = selected === value;
+                          return <TableCell key={value} className="text-center align-top"><button
+                            type="button"
+                            onClick={() => chooseAnswer(value)}
+                            disabled={wasWrong || (mode === 'practice' && isAnswered)}
+                            aria-label={`Câu ${questionIndex + 1}: chọn ${value === 0 ? 'True' : 'False'}`}
+                            aria-pressed={chosen}
+                            className={`mx-auto grid h-10 w-10 place-items-center rounded-full border-2 transition ${wasWrong ? 'cursor-not-allowed border-rose-300 bg-rose-100 text-rose-700' : chosen ? mode === 'practice' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-sky-500 bg-sky-500 text-white' : 'border-slate-300 bg-white hover:border-sky-500'}`}
+                          >{wasWrong ? <X className="size-5" /> : chosen ? <Check className="size-5" /> : null}</button></TableCell>;
+                        })}
+                      </TableRow></TableBody>
                     </Table>
                   </div>
-                  <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" onClick={() => setQuestionIndex(Math.max(0, questions.indexOf(trueFalseQuestions[0]) - 1))} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questions.indexOf(trueFalseQuestions.at(-1)!) < questions.length - 1 ? <Button onClick={() => setQuestionIndex(questions.indexOf(trueFalseQuestions.at(-1)!) + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button> : <Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">Nộp bài</Button>}</div>
                 </div>
               ) : (
                 <>
@@ -345,22 +363,24 @@ export default function Home() {
                   <RadioGroup value={isAnswered ? String(selected) : ''} onValueChange={(value) => chooseAnswer(Number(value))} className="grid gap-3">
                     {question.options.map((option, index) => {
                       const chosen = selected === index;
-                      const correct = isAnswered && index === question.answer;
-                      const wrong = chosen && !isCorrect;
-                      return <label key={option} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${feedbackVisible && correct ? 'border-emerald-400 bg-emerald-50' : feedbackVisible && wrong ? 'border-rose-400 bg-rose-50' : chosen ? 'border-sky-500 bg-sky-50' : 'border-slate-200 hover:border-sky-300 hover:bg-sky-50/40'}`}><RadioGroupItem value={String(index)} className="mt-0.5"/><span className="flex-1 text-base font-medium"><b className="mr-2">{String.fromCharCode(65 + index)}.</b><UnderlinedOption text={option} target={question.underlines?.[index]} /></span>{feedbackVisible && correct && <Check className="size-5 text-emerald-600"/>}{feedbackVisible && wrong && <X className="size-5 text-rose-600"/>}</label>;
+                      const wasWrong = mode === 'practice' && triedWrong.includes(index);
+                      const correct = mode === 'practice' && isAnswered && index === question.answer;
+                      const disabled = wasWrong || (mode === 'practice' && isAnswered);
+                      return <label key={`${index}-${option}`} className={`flex items-start gap-3 rounded-2xl border p-4 transition ${wasWrong ? 'cursor-not-allowed border-rose-300 bg-rose-50 text-rose-700' : correct ? 'border-emerald-400 bg-emerald-50' : chosen ? 'border-sky-500 bg-sky-50' : 'cursor-pointer border-slate-200 hover:border-sky-300 hover:bg-sky-50/40'}`}><RadioGroupItem value={String(index)} disabled={disabled} className="mt-0.5"/><span className="flex-1 text-base font-medium"><b className="mr-2">{String.fromCharCode(65 + index)}.</b><UnderlinedOption text={option} target={question.underlines?.[index]} /></span>{correct && <Check className="size-5 text-emerald-600"/>}{wasWrong && <X className="size-5 text-rose-600"/>}</label>;
                     })}
                   </RadioGroup>
-                  {isAnswered && feedbackVisible && <div aria-live="polite" className={`mt-5 overflow-hidden rounded-2xl border ${isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}`}><div className={`px-4 py-2 text-sm font-bold uppercase tracking-wide ${isCorrect ? 'bg-emerald-100' : 'bg-rose-100'}`}>Hướng dẫn giải chi tiết</div><div className="p-4"><strong>{isCorrect ? 'Chính xác!' : `Chưa đúng. Đáp án: ${String.fromCharCode(65 + question.answer)}. ${question.options[question.answer]}`}</strong><p className="mt-2 text-[15px] leading-7 opacity-90">{question.explanation}</p></div></div>}
-                  <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questionIndex === questions.length - 1 ? <Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">Nộp bài</Button> : <Button onClick={() => setQuestionIndex((value) => value + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button>}</div>
                 </>
               )}
+              {mode === 'practice' && triedWrong.length > 0 && !isAnswered && <p role="status" className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-base font-semibold text-rose-900">Chưa đúng. Phương án đã chọn bị khóa; hãy thử phương án khác trên cùng câu.</p>}
+              {mode === 'practice' && isAnswered && <div aria-live="polite" className="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-900"><div className="bg-emerald-100 px-4 py-2 text-sm font-bold uppercase tracking-wide">Hướng dẫn giải chi tiết</div><div className="p-4"><strong>Chính xác! Đáp án: {String.fromCharCode(65 + question.answer)}. {question.options[question.answer]}</strong><p className="mt-2 text-[15px] leading-7">{question.explanation}</p></div></div>}
+              <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questionIndex === questions.length - 1 ? <Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">{mode === 'test' ? 'Nộp bài' : 'Xem tổng kết'}</Button> : <Button disabled={mode === 'practice' && !isAnswered} onClick={() => setQuestionIndex((value) => value + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button>}</div>
             </article>
           )}
         </section>
 
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-          {mode === 'test' ? <div className="rounded-3xl bg-[#123c5a] p-5 text-white shadow-lg shadow-sky-100"><div className="mb-3 flex items-center justify-between"><span className="text-sm text-sky-100">Thời gian còn lại</span><Clock3 className="size-5 text-amber-300"/></div><strong suppressHydrationWarning className="font-mono text-3xl tracking-tight">{formatTime(secondsLeft)}</strong><div className="mt-4 flex justify-between border-t border-white/15 pt-3 text-sm"><span>Đã làm</span><b>{answeredCount}/{questions.length}</b></div><Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="mt-4 w-full bg-amber-500 font-bold text-white hover:bg-amber-600">NỘP BÀI</Button>{answeredCount < questions.length && <p className="mt-2 text-center text-xs leading-5 text-sky-100">Làm đủ 40 câu để mở nút nộp bài.</p>}</div> : <div className="rounded-3xl bg-sky-600 p-5 text-white shadow-lg shadow-sky-100"><div className="flex items-center justify-between"><span className="font-bold">Luyện tập tự do</span><BookOpen className="size-5 text-amber-200"/></div><p className="mt-2 text-sm leading-6 text-sky-50">Không giới hạn thời gian. Chọn đáp án để xem hướng dẫn ngay.</p><div className="mt-4 flex justify-between border-t border-white/20 pt-3 text-sm"><span>Đã luyện</span><b>{answeredCount}/{questions.length}</b></div>{answeredCount > 0 && <Button onClick={() => setSubmitted(true)} className="mt-4 w-full bg-white font-bold text-sky-700 hover:bg-sky-50">XEM TỔNG KẾT</Button>}</div>}
-          <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{questions.map((item, index) => { const done = answers[item.id] !== undefined; const marked = flagged.includes(item.id); return <button aria-label={`Mở câu ${index + 1}`} key={item.id} onClick={() => setQuestionIndex(index)} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-700 ring-offset-2' : ''} ${marked ? 'bg-indigo-400 text-white' : done ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{index + 1}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-sky-500"/>Câu đã làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-200"/>Câu chưa làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-indigo-400"/>Đã đánh dấu để xem lại</span></div></div>
+          {mode === 'test' ? <div className="rounded-3xl bg-[#123c5a] p-5 text-white shadow-lg shadow-sky-100"><div className="mb-3 flex items-center justify-between"><span className="text-sm text-sky-100">Thời gian còn lại</span><Clock3 className="size-5 text-amber-300"/></div><strong suppressHydrationWarning className="font-mono text-3xl tracking-tight">{formatTime(secondsLeft)}</strong><div className="mt-4 flex justify-between border-t border-white/15 pt-3 text-sm"><span>Đã làm</span><b>{answeredCount}/{questions.length}</b></div><Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="mt-4 w-full bg-amber-500 font-bold text-white hover:bg-amber-600">NỘP BÀI</Button>{answeredCount < questions.length && <p className="mt-2 text-center text-xs leading-5 text-sky-100">Làm đủ 40 câu để mở nút nộp bài.</p>}</div> : <div className="rounded-3xl bg-sky-600 p-5 text-white shadow-lg shadow-sky-100"><div className="flex items-center justify-between"><span className="font-bold">Luyện tập tự do</span><BookOpen className="size-5 text-amber-200"/></div><p className="mt-2 text-sm leading-6 text-sky-50">Không giới hạn thời gian. Chọn sai thì khóa phương án đó; trả lời đúng mới xem lời giải và sang câu tiếp.</p><div className="mt-4 flex justify-between border-t border-white/20 pt-3 text-sm"><span>Đã luyện</span><b>{answeredCount}/{questions.length}</b></div>{canSubmit && <Button onClick={() => setSubmitted(true)} className="mt-4 w-full bg-white font-bold text-sky-700 hover:bg-sky-50">XEM TỔNG KẾT</Button>}</div>}
+          <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{questions.map((item, index) => { const done = answers[item.id] !== undefined; const marked = flagged.includes(item.id); const locked = mode === 'practice' && firstUnansweredIndex !== -1 && index > firstUnansweredIndex; return <button aria-label={`Mở câu ${index + 1}`} key={item.id} disabled={locked} onClick={() => setQuestionIndex(index)} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-700 ring-offset-2' : ''} ${locked ? 'cursor-not-allowed bg-slate-50 text-slate-300' : marked ? 'bg-indigo-400 text-white' : done ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{index + 1}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-sky-500"/>Câu đã làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-200"/>Câu chưa làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-indigo-400"/>Đã đánh dấu để xem lại</span></div></div>
           <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Sparkles className="size-5 text-amber-600"/><strong className="text-amber-950">Từ vựng của Vịt</strong></div><button onClick={() => setVocabulary(randomVocabulary(grade))} className="rounded-full p-2 text-amber-700 transition hover:bg-amber-100" aria-label="Đổi ba từ vựng"><RefreshCw className="size-4"/></button></div><div className="mt-3 grid gap-3">{vocabulary.map((item) => <div key={item.word} className="rounded-2xl bg-white p-3 shadow-sm"><strong className="text-sky-800">{item.word}</strong><span className="ml-2 text-sm text-amber-800">{item.meaning}</span><p className="mt-1 text-sm leading-5 text-slate-600">{item.example}</p></div>)}</div></div>
         </aside>
       </div>
