@@ -13,7 +13,10 @@ import { exams9 } from '@/lib/exams9';
 import { exams10 } from '@/lib/exams10';
 import { vocabularyByGrade, type VocabularyItem } from '@/lib/vocabulary';
 import { distributeAnswers, distributeExams } from '@/lib/answer-distribution';
-import { GrammarLesson9 } from '@/components/grammar-lesson9';
+import { GrammarLesson } from '@/components/grammar-lesson';
+import { grammarLessons8 } from '@/lib/grammar-lessons8';
+import { grammarLessons9 } from '@/lib/grammar-lessons9';
+import { grammarLessons10 } from '@/lib/grammar-lessons10';
 
 type Answers = Record<number, number>;
 type ExamMode = 'practice' | 'test';
@@ -70,6 +73,9 @@ export default function Home() {
   const [dictionary, setDictionary] = useState<DictionaryState | null>(null);
   const availableExams = grade === 8 ? exams8 : grade === 9 ? balancedExams9 : balancedExams10;
   const exam = availableExams[examIndex];
+  const unitLesson = exam.menuGroup === 'unit'
+    ? grade === 8 ? grammarLessons8[exam.id - 6] : grade === 9 ? grammarLessons9[exam.id - 100] : grammarLessons10[exam.id]
+    : undefined;
   const questions = useMemo(() => mode === 'test' ? buildTestQuestions(exam.questions, availableExams, examIndex) : exam.questions, [availableExams, exam, examIndex, mode]);
   const question = questions[questionIndex];
   const selected = answers[question.id];
@@ -274,8 +280,8 @@ export default function Home() {
             <button onClick={() => switchMode('test')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'test' ? 'bg-[#123c5a] text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Làm bài test</button>
           </div>
           {exam.sourceNote && <p className="mb-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900"><strong>Nguồn ôn tập:</strong> {exam.sourceNote}</p>}
-          {grade === 9 && exam.menuGroup === 'unit' && (mode === 'practice' || submitted) && <GrammarLesson9 key={exam.id} unit={exam.id - 100} />}
-          {exam.reviewNotes && !(grade === 9 && exam.menuGroup === 'unit') && <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
+          {unitLesson && (mode === 'practice' || submitted) && <GrammarLesson key={`${grade}-${exam.id}`} grade={grade} lesson={unitLesson} />}
+          {exam.reviewNotes && !unitLesson && <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
             <summary className="cursor-pointer px-5 py-4 font-bold text-amber-950">Kiến thức cần nhớ trước khi luyện</summary>
             <div className="grid gap-3 border-t border-amber-200 p-4 sm:grid-cols-2">
               {exam.reviewNotes.map((note) => <div key={note.title} className="rounded-2xl bg-white p-4 shadow-sm">

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { grammarLessons9 } from '@/lib/grammar-lessons9';
+import type { GrammarLesson as GrammarLessonData } from '@/lib/grammar-lessons9';
 
-export function GrammarLesson9({ unit }: { unit: number }) {
-  const lesson = grammarLessons9[unit];
+export function GrammarLesson({ grade, lesson }: { grade: 8 | 9 | 10; lesson: GrammarLessonData }) {
+  const unit = lesson.unit;
   const [answers, setAnswers] = useState<Record<number, number>>({});
   if (!lesson) return null;
 
@@ -12,7 +12,7 @@ export function GrammarLesson9({ unit }: { unit: number }) {
   const correct = lesson.exercises.filter((question) => answers[question.id] === question.answer).length;
 
   return <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
-    <summary className="cursor-pointer px-5 py-4 text-base font-bold text-amber-950">Bài học ngữ pháp · Unit {unit}</summary>
+    <summary className="cursor-pointer px-5 py-4 text-base font-bold text-amber-950">Bài học ngữ pháp · English {grade} · Unit {unit}</summary>
     <div className="space-y-4 border-t border-amber-200 p-4 sm:p-5">
       {lesson.topics.map((topic) => <section key={topic.title} className="rounded-2xl border border-sky-100 bg-white p-4 sm:p-5">
         <h2 className="text-lg font-bold text-sky-900">{topic.title}</h2>
@@ -35,7 +35,7 @@ export function GrammarLesson9({ unit }: { unit: number }) {
               <legend className="px-1 text-base font-bold text-slate-900">{index + 1}. {question.prompt}</legend>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {question.options.map((option, optionIndex) => <label key={`${optionIndex}-${option}`} className={`flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2.5 text-base leading-6 ${selected !== undefined && optionIndex === question.answer ? 'border-emerald-400 bg-emerald-50' : selected === optionIndex ? 'border-rose-400 bg-rose-50' : 'border-slate-200 hover:border-sky-300'}`}>
-                  <input type="radio" name={`mini-unit-${unit}-question-${question.id}`} checked={selected === optionIndex} onChange={() => setAnswers((current) => ({ ...current, [question.id]: optionIndex }))} className="mt-1 accent-sky-600" />
+                  <input type="radio" name={`mini-grade-${grade}-unit-${unit}-question-${question.id}`} checked={selected === optionIndex} onChange={() => setAnswers((current) => ({ ...current, [question.id]: optionIndex }))} className="mt-1 accent-sky-600" />
                   <span><strong>{String.fromCharCode(65 + optionIndex)}.</strong> {option}</span>
                 </label>)}
               </div>
