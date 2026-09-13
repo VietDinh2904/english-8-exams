@@ -6,6 +6,7 @@ export type Question = {
   answer: number;
   explanation: string;
   underlines?: string[];
+  origin?: 'unit-enrichment';
 };
 
 export type Exam = {

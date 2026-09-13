@@ -17,6 +17,7 @@ import { GrammarLesson } from '@/components/grammar-lesson';
 import { grammarLessons8 } from '@/lib/grammar-lessons8';
 import { grammarLessons9 } from '@/lib/grammar-lessons9';
 import { grammarLessons10 } from '@/lib/grammar-lessons10';
+import { enrichUnitExam } from '@/lib/unit-enrichment';
 
 type Answers = Record<number, number>;
 type ExamMode = 'practice' | 'test';
@@ -24,15 +25,16 @@ type GradeLevel = 8 | 9 | 10;
 type MenuGroup = NonNullable<Exam['menuGroup']>;
 type ModelContext = { registerTool: (tool: Record<string, unknown>, options?: { signal: AbortSignal }) => void | Promise<void> };
 type DictionaryState = { word: string; translation: string; status: 'loading' | 'ready' | 'error' | 'empty'; x: number; y: number };
-const exams8 = distributeExams([...baseExams8, ...additionalExams8]);
-const balancedExams9 = distributeExams(exams9);
-const balancedExams10 = distributeExams(exams10);
+const exams8 = distributeExams([...baseExams8, ...additionalExams8].map((exam) => enrichUnitExam(exam, 8)));
+const balancedExams9 = distributeExams(exams9.map((exam) => enrichUnitExam(exam, 9)));
+const balancedExams10 = distributeExams(exams10.map((exam) => enrichUnitExam(exam, 10)));
 
-function buildTestQuestions(examQuestions: Question[], allExams: { questions: Question[] }[], examIndex: number) {
+function buildTestQuestions(examQuestions: Question[], allExams: Exam[], examIndex: number) {
   const chosen = [...examQuestions];
   const seen = new Set(chosen.map((item) => `${item.prompt}|${item.options.join('|')}`));
   const orderedExams = [...allExams.slice(examIndex + 1), ...allExams.slice(0, examIndex + 1)];
-  for (const item of orderedExams.flatMap((entry) => entry.questions).filter((entry) => entry.section === 'Language Focus')) {
+  const includeUnitEnrichment = allExams[examIndex].menuGroup === 'unit';
+  for (const item of orderedExams.flatMap((entry) => entry.questions).filter((entry) => entry.section === 'Language Focus' && (includeUnitEnrichment || entry.origin !== 'unit-enrichment'))) {
     const key = `${item.prompt}|${item.options.join('|')}`;
     if (!seen.has(key)) {
       chosen.push(item);

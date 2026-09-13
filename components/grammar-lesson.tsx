@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import type { GrammarLesson as GrammarLessonData } from '@/lib/grammar-lessons9';
+import { unitEnrichment } from '@/lib/unit-enrichment';
 
 export function GrammarLesson({ grade, lesson }: { grade: 8 | 9 | 10; lesson: GrammarLessonData }) {
   const unit = lesson.unit;
+  const enrichment = unitEnrichment[grade][unit];
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [wrongAttempts, setWrongAttempts] = useState<Record<number, number[]>>({});
@@ -31,8 +33,23 @@ export function GrammarLesson({ grade, lesson }: { grade: 8 | 9 | 10; lesson: Gr
   };
 
   return <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
-    <summary className="cursor-pointer px-5 py-4 text-base font-bold text-amber-950">Bài học ngữ pháp · English {grade} · Unit {unit}</summary>
+    <summary className="cursor-pointer px-5 py-4 text-base font-bold text-amber-950">Lý thuyết: từ vựng · phát âm · ngữ pháp · English {grade} · Unit {unit}</summary>
     <div className="space-y-4 border-t border-amber-200 p-4 sm:p-5">
+      {enrichment && <section className="rounded-2xl border border-sky-100 bg-white p-4 sm:p-5">
+        <h2 className="text-lg font-bold text-sky-900">Từ vựng theo chủ đề</h2>
+        <p className="mt-1 text-base leading-7 text-slate-700">Đọc phiên âm, học nghĩa và đặt từ vào một câu hoàn chỉnh.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">{enrichment.vocabulary.map((item) => <div key={item.word} className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-base leading-7">
+          <p lang="en" className="font-bold text-sky-950">{item.word} <span className="font-normal text-sky-700">{item.ipa}</span></p>
+          <p className="font-medium text-amber-900">{item.meaning}</p>
+          <p lang="en" className="text-slate-700">{item.example}</p>
+        </div>)}</div>
+      </section>}
+      {enrichment && <section className="rounded-2xl border border-sky-100 bg-white p-4 sm:p-5">
+        <h2 className="text-lg font-bold text-sky-900">Phát âm · {enrichment.pronunciation.title}</h2>
+        <p className="mt-3 text-base leading-7 text-slate-700">{enrichment.pronunciation.guidance}</p>
+        <div className="mt-3 rounded-xl bg-sky-50 p-3 text-base leading-7 text-sky-950" lang="en">{enrichment.pronunciation.examples}</div>
+        <p className="mt-3 text-sm leading-6 text-slate-600">Hãy đọc thành tiếng và so sánh âm hoặc vị trí trọng âm. Phần này không có bài nghe.</p>
+      </section>}
       {lesson.topics.map((topic) => <section key={topic.title} className="rounded-2xl border border-sky-100 bg-white p-4 sm:p-5">
         <h2 className="text-lg font-bold text-sky-900">{topic.title}</h2>
         <div className="mt-4 grid gap-4 text-base leading-7 text-slate-700">
