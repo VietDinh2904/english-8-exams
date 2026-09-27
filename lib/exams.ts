@@ -12,6 +12,8 @@ export type Question = {
   acceptedAnswers?: string[][];
   /** Options for each inline dropdown in a cloze passage. */
   gapOptions?: string[][];
+  /** Required keyword for sentence-transformation questions. */
+  givenWord?: string;
   hint?: string;
   underlines?: string[];
   origin?: 'unit-enrichment';

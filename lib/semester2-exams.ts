@@ -23,6 +23,16 @@ function createMixedQuestions(grade: Grade, period: Period, set: number): Questi
   const theme = topics[grade][period][(set - 1) % 3];
   const person = names[(set - 1) % names.length];
   const questions: Question[] = [];
+  const transformations = [
+    { word: 'ALTHOUGH', source: 'The task was difficult, but the students did not give up.', target: '[[0]], the students did not give up.', answer: 'Although the task was difficult', explanation: 'Although + clause expresses contrast.' },
+    { word: 'BECAUSE', source: 'The students stayed inside since it was raining heavily.', target: 'The students stayed inside [[0]].', answer: 'because it was raining heavily', explanation: 'Because introduces the reason in a clause.' },
+    { word: 'USED', source: 'Nam regularly walked to school when he was younger.', target: 'Nam [[0]] to school when he was younger.', answer: 'used to walk', explanation: 'Used to + base verb describes a past habit.' },
+    { word: 'UNLESS', source: 'You must revise carefully or you may forget the rule.', target: 'You may forget the rule [[0]].', answer: 'unless you revise carefully', explanation: 'Unless means “if … not”.' },
+    { word: 'DESPITE', source: 'The task was difficult, but the group completed it.', target: '[[0]], the group completed it.', answer: 'Despite the difficult task', explanation: 'Despite is followed by a noun phrase.' },
+    { word: 'SO', source: 'The instructions were clear, so everyone understood them.', target: 'The instructions were [[0]] everyone understood them.', answer: 'so clear that', explanation: 'Use so + adjective + that + clause.' },
+    { word: 'SUCH', source: 'It was a useful workshop, so many students joined it.', target: 'It was [[0]] many students joined it.', answer: 'such a useful workshop that', explanation: 'Use such + a/an + adjective + noun + that.' },
+  ];
+  const transformation = transformations[(set - 1) % transformations.length];
   type McqSpec = [string, string[], number, string];
   const patterns: Array<(cycle: number) => McqSpec> = [
     (cycle) => [`${names[(set + cycle) % names.length]} ${['usually', 'often', 'always'][cycle]} ___ useful notes after each lesson about ${theme}.`, ['makes', 'make', 'making', 'made'], 0, 'The subject is singular, so the present-simple verb takes -s.'],
@@ -64,7 +74,7 @@ function createMixedQuestions(grade: Grade, period: Period, set: number): Questi
     typed(37, 'Rearrange the given words to make a complete sentence. Do not change the words.', `our / finished / team / project / the / on time\n→ [[0]]`, ['Our team finished the project on time'], 'Use normal English order: subject + verb + object + time phrase.'),
     typed(38, 'Rearrange the given words to make a complete sentence. Do not change the words.', `because / useful / activity / enjoyed / was / it / the / we\n→ [[0]]`, ['We enjoyed the activity because it was useful'], 'Place the main clause before the because-clause.'),
     typed(39, 'Complete the second sentence so that it means the same as the first.', `This is the first time ${person} has joined a school project.\n→ ${person} has [[0]] a school project before.`, ['never joined'], '“This is the first time…” can be rewritten with the present perfect and “never … before”.'),
-    typed(40, 'Complete the second sentence using the word in capitals. Do not change the given word.', `ALTHOUGH\nThe task was difficult, but the students did not give up.\n→ [[0]], the students did not give up.`, ['Although the task was difficult'], 'Although + clause expresses contrast.', [['Although the task was difficult', 'although the task was difficult']]),
+    { ...typed(40, 'Complete the second sentence using the word in capitals. Do not change the given word.', `${transformation.source}\n→ ${transformation.target}`, [transformation.answer], transformation.explanation), givenWord: transformation.word },
   );
   return questions;
 }

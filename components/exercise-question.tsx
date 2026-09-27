@@ -39,6 +39,7 @@ export function ExerciseQuestion({ question, questionNumber, value, disabled, pr
     const values = Array.isArray(value) ? value : value === undefined ? [] : [String(value)];
     return <div className="space-y-5">
       {question.template && <p className="text-lg font-semibold leading-relaxed">{question.prompt}</p>}
+      {question.givenWord && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3"><span className="text-sm font-bold uppercase tracking-wide text-amber-700">Given word</span><strong className="mt-1 block text-xl tracking-wide text-amber-950">{question.givenWord}</strong></div>}
       <InlineTemplate question={question} values={values} disabled={disabled} onChange={onChange} />
       {showCheck && !practiceCorrect && <Button type="button" onClick={onCheck} disabled={disabled || !Array.from({ length: Array.isArray(question.answer) ? question.answer.length : 1 }, (_, index) => values[index] ?? '').every((item) => item.trim())} className="rounded-xl bg-sky-600">Kiểm tra câu trả lời</Button>}
     </div>;
