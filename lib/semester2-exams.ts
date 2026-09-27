@@ -64,7 +64,7 @@ function createMixedQuestions(grade: Grade, period: Period, set: number): Questi
     typed(37, 'Rearrange the given words to make a complete sentence. Do not change the words.', `our / finished / team / project / the / on time\n→ [[0]]`, ['Our team finished the project on time'], 'Use normal English order: subject + verb + object + time phrase.'),
     typed(38, 'Rearrange the given words to make a complete sentence. Do not change the words.', `because / useful / activity / enjoyed / was / it / the / we\n→ [[0]]`, ['We enjoyed the activity because it was useful'], 'Place the main clause before the because-clause.'),
     typed(39, 'Complete the second sentence so that it means the same as the first.', `This is the first time ${person} has joined a school project.\n→ ${person} has [[0]] a school project before.`, ['never joined'], '“This is the first time…” can be rewritten with the present perfect and “never … before”.'),
-    typed(40, 'Complete the second sentence using the word in capitals. Do not change the given word.', `The task was difficult, but the students did not give up. (ALTHOUGH)\n→ [[0]], the students did not give up.`, ['Although the task was difficult'], 'Although + clause expresses contrast.', [['Although the task was difficult', 'although the task was difficult']]),
+    typed(40, 'Complete the second sentence using the word in capitals. Do not change the given word.', `ALTHOUGH\nThe task was difficult, but the students did not give up.\n→ [[0]], the students did not give up.`, ['Although the task was difficult'], 'Although + clause expresses contrast.', [['Although the task was difficult', 'although the task was difficult']]),
   );
   return questions;
 }

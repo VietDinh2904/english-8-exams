@@ -16,7 +16,8 @@ function UnderlinedOption({ text, target }: { text: string; target?: string }) {
 
 function InlineTemplate({ question, values, disabled, onChange }: { question: Question; values: string[]; disabled: boolean; onChange: (values: string[]) => void }) {
   const parts = (question.template ?? question.prompt).split(/(\[\[\d+\]\])/g);
-  return <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-[17px] leading-10 text-slate-800">
+  const longAnswer = question.kind === 'typed' && (Array.isArray(question.answer) ? question.answer : [question.answer]).some((answer) => String(answer).length > 24);
+  return <div className="whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 p-5 text-[17px] leading-10 text-slate-800">
     {parts.map((part, partIndex) => {
       const match = part.match(/^\[\[(\d+)\]\]$/);
       if (!match) return <span key={partIndex}>{part}</span>;
@@ -27,7 +28,7 @@ function InlineTemplate({ question, values, disabled, onChange }: { question: Qu
           {(question.gapOptions?.[gapIndex] ?? []).map((option) => <option key={option} value={option}>{option}</option>)}
         </select>;
       }
-      return <input key={partIndex} disabled={disabled} value={values[gapIndex] ?? ''} onChange={(event) => { const next = [...values]; next[gapIndex] = event.target.value; onChange(next); }} autoComplete="off" spellCheck={false} aria-label={`Blank ${gapIndex + 1}`} className="mx-1 inline-block w-44 rounded-lg border-0 border-b-2 border-sky-400 bg-white px-2 py-1 font-semibold text-sky-950 outline-none focus:border-sky-700 disabled:bg-slate-100" />;
+      return <input key={partIndex} disabled={disabled} value={values[gapIndex] ?? ''} onChange={(event) => { const next = [...values]; next[gapIndex] = event.target.value; onChange(next); }} autoComplete="off" spellCheck={false} aria-label={`Blank ${gapIndex + 1}`} className={`${longAnswer ? 'my-2 block w-full' : 'mx-1 inline-block w-44'} rounded-lg border-0 border-b-2 border-sky-400 bg-white px-3 py-1 font-semibold text-sky-950 outline-none focus:border-sky-700 disabled:bg-slate-100`} />;
     })}
   </div>;
 }
