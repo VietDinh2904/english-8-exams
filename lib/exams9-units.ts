@@ -213,42 +213,23 @@ const unitSpecs: UnitSpec[] = [
   },
 ];
 
-function vocabularyQuestions(items: VocabItem[]): Question[] {
-  return items.map((item, index) => {
-    const answer = index % 4;
-    const distractors = [1, 2, 3].map((step) => items[(index + step) % items.length].word);
-    const options = [...distractors];
-    options.splice(answer, 0, item.word);
-    return {
-      id: index + 1,
-      section: 'Language Focus',
-      prompt: `Từ hoặc cụm từ nào có nghĩa “${item.meaning}”?`,
-      options,
-      answer,
-      explanation: `“${item.word}” có nghĩa là “${item.meaning}”. Hãy học từ trong một cụm hoặc câu hoàn chỉnh để nhớ cách dùng, không chỉ học nghĩa riêng lẻ.`,
-    };
-  });
-}
-
 export const unitExams9: Exam[] = unitSpecs.map((unit) => ({
   id: 100 + unit.id,
   menuLabel: `Unit ${unit.id} · ${unit.title}`,
   menuGroup: 'unit',
   title: `English 9 · Unit ${unit.id}: ${unit.title}`,
-  theme: `${unit.topic} · 20 câu`,
-  sourceNote: 'Nội dung được biên soạn mới theo phạm vi từ vựng và ngữ pháp công khai của Tiếng Anh 9 Global Success trên Loigiaihay; không gồm nghe, phát âm hay bài đọc.',
+  theme: `${unit.topic} · Grammar practice`,
+  sourceNote: 'Nội dung được biên soạn mới theo phạm vi từ vựng và ngữ pháp công khai của Tiếng Anh 9 Global Success; câu hỏi dùng hoàn toàn bằng tiếng Anh và không gồm phần nghe.',
   passageTitle: '',
   passage: '',
   reviewNotes: unit.notes,
-  questions: [
-    ...vocabularyQuestions(unit.vocabulary),
-    ...unit.grammar.map((item, index): Question => {
+  questions: unit.grammar.map((item, index): Question => {
       const answer = index % item.options.length;
       const correctOption = item.options[item.answer];
       const options = item.options.filter((_, optionIndex) => optionIndex !== item.answer);
       options.splice(answer, 0, correctOption);
       return {
-        id: unit.vocabulary.length + index + 1,
+        id: index + 1,
         section: 'Language Focus',
         prompt: item.prompt,
         options,
@@ -256,5 +237,4 @@ export const unitExams9: Exam[] = unitSpecs.map((unit) => ({
         explanation: item.explanation,
       };
     }),
-  ],
 }));

@@ -13,7 +13,7 @@ export function distributeAnswers(questions: Question[], seed: string): Question
   const counts = [0, 0, 0, 0];
   let previous = -1;
   return questions.map((question, index) => {
-    if (question.options.length !== 4 || question.answer < 0 || question.answer > 3) return question;
+    if (question.kind === 'typed' || question.kind === 'cloze-dropdown' || typeof question.answer !== 'number' || question.options.length !== 4 || question.answer < 0 || question.answer > 3) return question;
 
     const lowest = Math.min(...counts);
     const leastUsed = [0, 1, 2, 3].filter((position) => counts[position] === lowest);

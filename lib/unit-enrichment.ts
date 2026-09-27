@@ -64,7 +64,9 @@ export function enrichUnitExam(exam: Exam, grade: 8 | 9 | 10): Exam {
     return {
       id: exam.questions.length + index + 1,
       section: 'Language Focus',
-      prompt: `Chọn từ/cụm từ phù hợp với nghĩa “${entry.meaning}”.`,
+      prompt: entry.example.toLowerCase().includes(entry.word.toLowerCase())
+        ? entry.example.replace(new RegExp(entry.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '___')
+        : `Which unit word best completes this example? ${entry.example}`,
       options,
       answer,
       explanation: `“${entry.word}” ${entry.ipa} nghĩa là “${entry.meaning}”. Ví dụ: ${entry.example}`,

@@ -3,8 +3,16 @@ export type Question = {
   section: 'Language Focus' | 'Reading';
   prompt: string;
   options: string[];
-  answer: number;
+  answer: number | string | string[];
   explanation: string;
+  kind?: 'mcq' | 'typed' | 'cloze-dropdown';
+  /** Text containing [[0]], [[1]]… markers for inline inputs/selects. */
+  template?: string;
+  /** Accepted answers for each typed blank. The first value is shown after submission. */
+  acceptedAnswers?: string[][];
+  /** Options for each inline dropdown in a cloze passage. */
+  gapOptions?: string[][];
+  hint?: string;
   underlines?: string[];
   origin?: 'unit-enrichment';
 };
@@ -12,7 +20,7 @@ export type Question = {
 export type Exam = {
   id: number;
   menuLabel?: string;
-  menuGroup?: 'review' | 'survey' | 'midterm' | 'final' | 'unit';
+  menuGroup?: 'review' | 'survey' | 'midterm' | 'final' | 'midterm2' | 'final2' | 'unit';
   title: string;
   theme: string;
   sourceNote?: string;
