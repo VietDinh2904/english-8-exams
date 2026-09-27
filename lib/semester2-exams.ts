@@ -23,20 +23,21 @@ function createMixedQuestions(grade: Grade, period: Period, set: number): Questi
   const theme = topics[grade][period][(set - 1) % 3];
   const person = names[(set - 1) % names.length];
   const questions: Question[] = [];
-  const patterns = [
-    [`${person} usually ___ useful notes after each lesson about ${theme}.`, ['makes', 'make', 'making', 'made'], 0, 'The subject is singular, so the present-simple verb takes -s.'],
-    [`Our class is interested ___ a project about ${theme}.`, ['in', 'on', 'at', 'for'], 0, 'Use the fixed expression “be interested in”.'],
-    [`The team worked ___ than it did last month.`, ['more carefully', 'careful', 'most carefully', 'more careful'], 0, 'An adverb is needed after “worked”; “than” signals the comparative form.'],
-    [`If students prepare well, they ___ more confident.`, ['will feel', 'felt', 'would feel', 'feelings'], 0, 'The first conditional uses if + present simple, will + base verb.'],
-    [`The information ___ by the teacher yesterday.`, ['was checked', 'checked', 'is checking', 'has check'], 0, 'A past passive form is required: was/were + past participle.'],
-    [`Choose the best connector: The task was difficult; ___, the group completed it.`, ['however', 'because', 'so that', 'unless'], 0, '“However” introduces a contrast between two complete ideas.'],
-    [`Which word is closest in meaning to “helpful” in this context?`, ['useful', 'harmful', 'careless', 'silent'], 0, '“Useful” and “helpful” have similar meanings.'],
-    [`The students agreed ___ their results with the class.`, ['to share', 'sharing to', 'share', 'shared'], 0, 'Use agree + to-infinitive.'],
-  ] as const;
+  type McqSpec = [string, string[], number, string];
+  const patterns: Array<(cycle: number) => McqSpec> = [
+    (cycle) => [`${names[(set + cycle) % names.length]} ${['usually', 'often', 'always'][cycle]} ___ useful notes after each lesson about ${theme}.`, ['makes', 'make', 'making', 'made'], 0, 'The subject is singular, so the present-simple verb takes -s.'],
+    (cycle) => [`${['Our class', 'The English club', 'The research team'][cycle]} is interested ___ a project about ${theme}.`, ['in', 'on', 'at', 'for'], 0, 'Use the fixed expression “be interested in”.'],
+    (cycle) => [`The ${['team worked', 'group presented', 'class researched'][cycle]} ___ than ${['it did last month', 'it did before', 'the other group did'][cycle]}.`, ['more carefully', 'careful', 'most carefully', 'more careful'], 0, 'An adverb is needed after the verb; “than” signals the comparative form.'],
+    (cycle) => [`If ${['students prepare well', 'we follow the plan', 'the club practises regularly'][cycle]}, ${['they', 'we', 'it'][cycle]} ___ more confident.`, ['will feel', 'felt', 'would feel', 'feelings'], 0, 'The first conditional uses if + present simple, will + base verb.'],
+    (cycle) => [`The ${['information', 'final report', 'project outline'][cycle]} ___ by the teacher ${['yesterday', 'last Friday', 'before the meeting'][cycle]}.`, ['was checked', 'checked', 'is checking', 'has check'], 0, 'A past passive form is required: was/were + past participle.'],
+    (cycle) => [`Choose the best connector: The ${['task was difficult', 'deadline was close', 'instructions were complex'][cycle]}; ___, the group completed the work.`, ['however', 'because', 'so that', 'unless'], 0, '“However” introduces a contrast between two complete ideas.'],
+    (cycle) => [`Which word is closest in meaning to “${['helpful', 'reliable', 'challenging'][cycle]}”?`, [['useful', 'harmful', 'careless', 'silent'], ['dependable', 'temporary', 'colourful', 'noisy'], ['difficult', 'simple', 'ordinary', 'quiet']][cycle], 0, `The first option has the closest meaning to “${['helpful', 'reliable', 'challenging'][cycle]}”.`],
+    (cycle) => [`The students ${['agreed', 'promised', 'decided'][cycle]} ___ their ${['results', 'research', 'presentation'][cycle]} with the class.`, ['to share', 'sharing to', 'share', 'shared'], 0, `Use ${['agree', 'promise', 'decide'][cycle]} + to-infinitive.`],
+  ];
   for (let index = 0; index < 24; index += 1) {
-    const [prompt, options, answer, explanation] = patterns[index % patterns.length];
-    const cycle = Math.floor(index / patterns.length) + 1;
-    questions.push(mcq(index + 1, `${prompt} (Context ${set}.${cycle})`, [...options], answer, `${explanation} Chủ điểm: ${theme}.`));
+    const cycle = Math.floor(index / patterns.length);
+    const [prompt, options, answer, explanation] = patterns[index % patterns.length](cycle);
+    questions.push(mcq(index + 1, prompt, options, answer, `${explanation} Chủ điểm: ${theme}.`));
   }
 
   questions.push(
