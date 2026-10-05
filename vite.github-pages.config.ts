@@ -8,7 +8,7 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: path.join(projectRoot, 'github-pages'),
-  base: '/english-8-exams/',
+  base: '/english-moet/',
   css: { postcss: { plugins: [tailwindcss()] } },
   plugins: [react()],
   resolve: { alias: { '@': projectRoot } },
