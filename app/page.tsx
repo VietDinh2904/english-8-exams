@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Clock3, Flag, Languages, Menu, RefreshCw, RotateCcw, Sparkles, X } from 'lucide-react';
+import { Archive, BookOpen, BookMarked, ChevronDown, ChevronLeft, ChevronRight, Clock3, Coins, Flag, Languages, MapPinned, Menu, RefreshCw, RotateCcw, Settings2, Sparkles, Target, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -35,6 +35,13 @@ type ChickenSpawn = { id: number; x: number; y: number; size: number; rotate: nu
 type FoodKind = 'roast' | 'grilled' | 'fried' | 'rice' | 'plucked';
 type FoodSpawn = ChickenSpawn & { kind: FoodKind };
 type Weapon = 'knife' | 'grenade' | 'pencil';
+type EffectLevel = 'full' | 'light' | 'off';
+type HubPanel = 'map' | 'vault' | 'wrong' | 'missions' | null;
+type FlagEntry = { key: string; grade: GradeLevel; examId: number; examTitle: string; prompt: string; section: Question['section']; savedAt: number };
+type WrongEntry = FlagEntry & { mistakes: number };
+type DailyStats = { date: string; correct: number; flags: number; completed: number };
+type BossPenaltyKind = 'keyboard' | 'extra-options' | 'one-hp' | 'screen-lock' | 'duck-salad' | 'duck-porridge' | 'plucked-duck' | 'peking-duck' | 'duck-bamboo';
+type BossPenalty = { kind: BossPenaltyKind; seconds: number; label: string; asset?: string };
 
 const STARTER_AID: AidInventory = { cotton: 0, medicine: 0, injection: 0 };
 const AID_ITEMS: { kind: AidKind; name: string; icon: string; heal: number; color: string }[] = [
@@ -62,6 +69,22 @@ const SURVIVAL_TARGET = 10;
 const FOOD_IMAGES: Record<FoodKind, string> = {
   roast: 'chicken-roast-v2.png', grilled: 'chicken-grilled-v2.png', fried: 'chicken-fried-v2.png',
   rice: 'chicken-rice-v2.png', plucked: 'plucked-chicken-v2.png',
+};
+const JOURNEY_STAGES: { group: MenuGroup | 'survival'; label: string; icon: string; position: [number, number] }[] = [
+  { group: 'unit', label: 'Học theo Unit', icon: '📘', position: [23, 81] },
+  { group: 'review', label: 'Ôn tập', icon: '🧠', position: [28, 62] },
+  { group: 'midterm', label: 'Giữa kỳ I', icon: '⭐', position: [26, 38] },
+  { group: 'final', label: 'Cuối kỳ I', icon: '🏙️', position: [44, 28] },
+  { group: 'midterm2', label: 'Giữa kỳ II', icon: '🔬', position: [52, 51] },
+  { group: 'final2', label: 'Cuối kỳ II', icon: '✈️', position: [70, 47] },
+  { group: 'survival', label: 'Boss Survival', icon: '🏰', position: [88, 22] },
+];
+const BOSS_FOOD_EFFECTS: Record<Extract<BossPenaltyKind, 'duck-salad' | 'duck-porridge' | 'plucked-duck' | 'peking-duck' | 'duck-bamboo'>, { label: string; asset: string }> = {
+  'duck-salad': { label: 'Dĩa gỏi vịt!', asset: 'duck-salad-v1.png' },
+  'duck-porridge': { label: 'Nồi cháo vịt!', asset: 'duck-porridge-v1.png' },
+  'plucked-duck': { label: 'Vịt trụi lông!', asset: 'plucked-duck-v1.png' },
+  'peking-duck': { label: 'Vịt quay Bắc Kinh!', asset: 'peking-duck-v1.png' },
+  'duck-bamboo': { label: 'Vịt kho măng!', asset: 'duck-bamboo-v1.png' },
 };
 
 function rollAidDrop(totalCorrect: number): AidKind {
@@ -127,13 +150,13 @@ function questionFormat(question: Question) {
   return 'mcq';
 }
 
-function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, targetCount: number, seenBefore: Set<string>) {
+function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, targetCount: number, seenBefore: Set<string>, pinnedKey?: string | null, excludeTypedVocabulary = false) {
   const sourcePool = allExams.flatMap((source, sourceIndex) => source.questions.map((question) => ({
     ...question,
     passage: question.section === 'Reading' ? source.passage : undefined,
     passageTitle: question.section === 'Reading' ? source.passageTitle : undefined,
     sourceIndex,
-  })));
+  }))).filter((question) => !(excludeTypedVocabulary && question.skillArea === 'Vocabulary' && question.kind === 'typed'));
   const unique = new Map<string, Question & { sourceIndex: number }>();
   for (const item of sourcePool) if (!unique.has(questionKey(item))) unique.set(questionKey(item), item);
   const priority = (items: (Question & { sourceIndex: number })[]) => [
@@ -197,7 +220,12 @@ function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, ta
   const languageBlock = shuffled(chosen.filter((item) => item.section === 'Language Focus'));
   const readingBlock = chosen.filter((item) => item.section === 'Reading');
   const writingBlock = shuffled(chosen.filter((item) => item.section === 'Writing'));
-  return distributeAnswers([...languageBlock, ...readingBlock, ...writingBlock].slice(0, targetCount).map((item, index) => ({ ...item, id: index + 1 })), `mixed|${examIndex}|${targetCount}|${Date.now()}`);
+  let arranged = [...languageBlock, ...readingBlock, ...writingBlock].slice(0, targetCount);
+  if (pinnedKey) {
+    const pinned = pool.find((item) => questionKey(item) === pinnedKey);
+    if (pinned) arranged = [pinned, ...arranged.filter((item) => questionKey(item) !== pinnedKey)].slice(0, targetCount);
+  }
+  return distributeAnswers(arranged.map((item, index) => ({ ...item, id: index + 1 })), `mixed|${examIndex}|${targetCount}|${Date.now()}`);
 }
 
 function randomVocabulary(grade: GradeLevel): VocabularyItem[] {
@@ -257,6 +285,17 @@ export default function Home() {
   const [pencilUnlocked, setPencilUnlocked] = useState(false);
   const [pencilCharges, setPencilCharges] = useState(0);
   const [seenAtSelection, setSeenAtSelection] = useState<Set<string>>(new Set());
+  const [hubPanel, setHubPanel] = useState<HubPanel>(null);
+  const [flagVault, setFlagVault] = useState<FlagEntry[]>([]);
+  const [wrongBook, setWrongBook] = useState<WrongEntry[]>([]);
+  const [dailyStats, setDailyStats] = useState<DailyStats>({ date: new Date().toISOString().slice(0, 10), correct: 0, flags: 0, completed: 0 });
+  const [duckCoins, setDuckCoins] = useState(0);
+  const [completedExamKeys, setCompletedExamKeys] = useState<string[]>([]);
+  const [effectLevel, setEffectLevel] = useState<EffectLevel>('full');
+  const [storageReady, setStorageReady] = useState(false);
+  const [focusQuestionKey, setFocusQuestionKey] = useState<string | null>(null);
+  const [vocabHintSteps, setVocabHintSteps] = useState<Record<string, number>>({});
+  const [bossPenalty, setBossPenalty] = useState<BossPenalty | null>(null);
   const availableExams = examsByGrade[grade];
   const exam = availableExams[examIndex];
   const selectedUnit = unitNumber(exam, grade);
@@ -265,9 +304,12 @@ export default function Home() {
       ? extendedGrammarLessons[grade][selectedUnit]
       : grade === 8 ? grammarLessons8[selectedUnit] : grade === 9 ? grammarLessons9[selectedUnit] : grammarLessons10[selectedUnit]
     : undefined;
-  const questions = useMemo(() => buildMixedQuestions(exam, availableExams, examIndex, mode === 'practice' ? exam.questions.length : 40, seenAtSelection), [availableExams, exam, examIndex, mode, seenAtSelection]);
+  const questions = useMemo(() => buildMixedQuestions(exam, availableExams, examIndex, mode === 'practice' ? exam.questions.length : 40, seenAtSelection, focusQuestionKey, mode === 'test'), [availableExams, exam, examIndex, focusQuestionKey, mode, seenAtSelection]);
   const question = questions[questionIndex];
   const selected = drafts[question.id] ?? answers[question.id];
+  const displayQuestion = useMemo<Question>(() => bossPenalty?.kind === 'extra-options' && question.kind !== 'typed' && question.kind !== 'cloze-dropdown' && question.options.length >= 2
+    ? { ...question, options: [...question.options, 'Both A and B', 'Not enough information'] }
+    : question, [bossPenalty?.kind, question]);
 
   const score = useMemo(() => questions.filter((item) => isQuestionCorrect(item, answers[item.id])).length, [answers, questions]);
   const answeredCount = questions.filter((item) => isAnswerComplete(item, answers[item.id])).length;
@@ -283,6 +325,21 @@ export default function Home() {
   const stageName = isBossStage ? 'Màn Boss Gà Khổng Lồ' : SURVIVAL_STAGES[vehicleIndex];
   const survivalGameOver = mode === 'survival' && survivalEnded;
   const nextAidMilestone = Math.max(5, Math.ceil((practiceCorrectCount + 1) / 5) * 5);
+  const currentFlagged = flagVault.some((item) => item.key === questionKey(question));
+  const dailyMissions = [
+    { label: 'Đúng 10 câu', value: dailyStats.correct, target: 10, icon: '🎯' },
+    { label: 'Cắm 3 lá cờ', value: dailyStats.flags, target: 3, icon: '🚩' },
+    { label: 'Hoàn thành 1 bài', value: dailyStats.completed, target: 1, icon: '🏆' },
+  ];
+  const dailyDone = dailyMissions.filter((item) => item.value >= item.target).length;
+  const vocabHintAnswer = question.skillArea === 'Vocabulary' && question.kind === 'typed'
+    ? String(Array.isArray(question.answer) ? question.answer[0] ?? '' : question.answer)
+    : '';
+  const vocabHintStep = vocabHintSteps[questionKey(question)] ?? 0;
+  const vocabHintText = vocabHintAnswer
+    ? [...vocabHintAnswer].map((character, index) => /[a-z]/i.test(character) ? index < vocabHintStep ? character : '_' : character).join(' ')
+    : '';
+  const currentWrongAttempt = wrongAttempts[question.id] ?? 1;
 
   useEffect(() => {
     try {
@@ -292,6 +349,32 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const storedDaily = JSON.parse(window.localStorage.getItem('english-moet-daily') ?? 'null') as DailyStats | null;
+      setFlagVault(JSON.parse(window.localStorage.getItem('english-moet-flag-vault') ?? '[]') as FlagEntry[]);
+      setWrongBook(JSON.parse(window.localStorage.getItem('english-moet-wrong-book') ?? '[]') as WrongEntry[]);
+      setCompletedExamKeys(JSON.parse(window.localStorage.getItem('english-moet-completed') ?? '[]') as string[]);
+      setDuckCoins(Number(window.localStorage.getItem('english-moet-coins') ?? 0));
+      setEffectLevel((window.localStorage.getItem('english-moet-effects') as EffectLevel | null) ?? 'full');
+      setDailyStats(storedDaily?.date === today ? storedDaily : { date: today, correct: 0, flags: 0, completed: 0 });
+    } catch { /* localStorage is optional */ }
+    setStorageReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!storageReady) return;
+    try {
+      window.localStorage.setItem('english-moet-flag-vault', JSON.stringify(flagVault));
+      window.localStorage.setItem('english-moet-wrong-book', JSON.stringify(wrongBook));
+      window.localStorage.setItem('english-moet-completed', JSON.stringify(completedExamKeys));
+      window.localStorage.setItem('english-moet-coins', String(duckCoins));
+      window.localStorage.setItem('english-moet-effects', effectLevel);
+      window.localStorage.setItem('english-moet-daily', JSON.stringify(dailyStats));
+    } catch { /* localStorage is optional */ }
+  }, [completedExamKeys, dailyStats, duckCoins, effectLevel, flagVault, storageReady, wrongBook]);
+
+  useEffect(() => {
     if (!question) return;
     try {
       const stored = JSON.parse(window.localStorage.getItem('english-moet-seen-questions') ?? '[]') as string[];
@@ -299,6 +382,12 @@ export default function Home() {
       window.localStorage.setItem('english-moet-seen-questions', JSON.stringify(updated));
     } catch { /* localStorage is optional */ }
   }, [question]);
+
+  useEffect(() => {
+    if (!focusQuestionKey) return;
+    const focusedIndex = questions.findIndex((item) => questionKey(item) === focusQuestionKey);
+    if (focusedIndex >= 0) setQuestionIndex(focusedIndex);
+  }, [focusQuestionKey, questions]);
 
   useEffect(() => {
     if ((mode !== 'test' && mode !== 'survival') || submitted || survivalEnded || secondsLeft <= 0) return;
@@ -332,11 +421,25 @@ export default function Home() {
   }, [lockSeconds]);
 
   useEffect(() => {
+    if (!bossPenalty || bossPenalty.seconds <= 0) return;
+    const timer = window.setInterval(() => setBossPenalty((current) => current && current.seconds > 1 ? { ...current, seconds: current.seconds - 1 } : null), 1000);
+    return () => window.clearInterval(timer);
+  }, [bossPenalty]);
+
+  useEffect(() => {
+    if (bossPenalty?.kind !== 'keyboard') return;
+    const blockKeyboard = (event: KeyboardEvent) => { event.preventDefault(); event.stopPropagation(); };
+    window.addEventListener('keydown', blockKeyboard, true);
+    return () => window.removeEventListener('keydown', blockKeyboard, true);
+  }, [bossPenalty?.kind]);
+
+  useEffect(() => {
     setVocabulary(randomVocabulary(grade));
   }, [grade, examIndex]);
 
   const selectExam = useCallback((index: number) => {
     setSeenAtSelection(readSeenQuestions());
+    setFocusQuestionKey(null);
     setExamIndex(index);
     setQuestionIndex(0);
     setAnswers({});
@@ -368,10 +471,13 @@ export default function Home() {
     setFoodSpawns([]);
     setScreenBlurred(false);
     setAgentNotice(false);
+    setVocabHintSteps({});
+    setBossPenalty(null);
   }, [mode]);
 
   const switchGrade = (nextGrade: GradeLevel) => {
     setSeenAtSelection(readSeenQuestions());
+    setFocusQuestionKey(null);
     setGrade(nextGrade);
     setExamIndex(0);
     setQuestionIndex(0);
@@ -404,10 +510,13 @@ export default function Home() {
     setFoodSpawns([]);
     setScreenBlurred(false);
     setAgentNotice(false);
+    setVocabHintSteps({});
+    setBossPenalty(null);
   };
 
   const switchMode = (nextMode: ExamMode) => {
     setSeenAtSelection(readSeenQuestions());
+    setFocusQuestionKey(null);
     setMode(nextMode);
     setQuestionIndex(0);
     setAnswers({});
@@ -439,9 +548,13 @@ export default function Home() {
     setFoodSpawns([]);
     setScreenBlurred(false);
     setAgentNotice(false);
+    setVocabHintSteps({});
+    setBossPenalty(null);
   };
 
   const recordCorrect = useCallback(() => {
+    setDailyStats((current) => ({ ...current, correct: current.correct + 1 }));
+    setDuckCoins((current) => current + 1);
     setCorrectStreak((current) => {
       const next = current + 1;
       setBestStreak((best) => Math.max(best, next));
@@ -460,9 +573,16 @@ export default function Home() {
     }
   }, [mode]);
 
-  const recordWrong = useCallback((questionId: number) => {
+  const recordWrong = useCallback((wrongQuestion: Question) => {
+    const questionId = wrongQuestion.id;
     const attempt = (wrongAttempts[questionId] ?? 0) + 1;
+    const key = questionKey(wrongQuestion);
     setWrongAttempts((current) => ({ ...current, [questionId]: attempt }));
+    setWrongBook((current) => {
+      const existing = current.find((item) => item.key === key);
+      const entry: WrongEntry = { key, grade, examId: exam.id, examTitle: exam.title, prompt: wrongQuestion.prompt, section: wrongQuestion.section, savedAt: Date.now(), mistakes: (existing?.mistakes ?? 0) + 1 };
+      return [entry, ...current.filter((item) => item.key !== key)].slice(0, 100);
+    });
     setArmorPoints((current) => {
       if (current > 0) return current - 1;
       setDamage((damageNow) => damageNow + 1);
@@ -482,7 +602,7 @@ export default function Home() {
     setLockedQuestion(questionId);
     setLockSeconds(attempt === 1 ? 0 : attempt === 2 ? 10 : 20);
     setHintOpen(true);
-  }, [wrongAttempts]);
+  }, [exam.id, exam.title, grade, wrongAttempts]);
 
   const advanceSurvivalQuestion = useCallback(() => {
     setQuestionIndex((current) => (current + 1) % questions.length);
@@ -545,8 +665,42 @@ export default function Home() {
     advanceSurvivalQuestion();
   }, [advanceSurvivalQuestion, defeatChickens, recordCorrect, weapon]);
 
+  const triggerBossPenalty = useCallback(() => {
+    const kinds: BossPenaltyKind[] = ['keyboard', 'extra-options', 'one-hp', 'screen-lock', 'duck-salad', 'duck-porridge', 'plucked-duck', 'peking-duck', 'duck-bamboo'];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    if (kind === 'one-hp') {
+      setBossPenalty({ kind, seconds: 3, label: 'Boss ép máu còn 1!' });
+      return kind;
+    }
+    if (kind === 'keyboard') {
+      setBossPenalty({ kind, seconds: 6, label: 'Khóa bàn phím!' });
+      return kind;
+    }
+    if (kind === 'extra-options') {
+      setBossPenalty({ kind, seconds: 15, label: 'Đáp án nhiễu: +2 lựa chọn!' });
+      return kind;
+    }
+    if (kind === 'screen-lock') {
+      setBossPenalty({ kind, seconds: 5, label: 'Boss khóa màn hình!' });
+      return kind;
+    }
+    const food = BOSS_FOOD_EFFECTS[kind];
+    setBossPenalty({ kind, seconds: 3, label: food.label, asset: food.asset });
+    return kind;
+  }, []);
+
   const recordSurvivalWrong = useCallback(() => {
+    const wrongQuestion = questions[questionIndex];
+    if (wrongQuestion) {
+      const key = questionKey(wrongQuestion);
+      setWrongBook((current) => {
+        const existing = current.find((item) => item.key === key);
+        const entry: WrongEntry = { key, grade, examId: exam.id, examTitle: exam.title, prompt: wrongQuestion.prompt, section: wrongQuestion.section, savedAt: Date.now(), mistakes: (existing?.mistakes ?? 0) + 1 };
+        return [entry, ...current.filter((item) => item.key !== key)].slice(0, 100);
+      });
+    }
     setCorrectStreak(0);
+    const bossEffect = isBossStage ? triggerBossPenalty() : null;
     setHitPulse((current) => current + 1);
     if (typeof document !== 'undefined' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       document.documentElement.animate([
@@ -570,6 +724,7 @@ export default function Home() {
       return [...current, ...created].slice(-32);
     });
     setSurvivalLives((lives) => {
+      if (bossEffect === 'one-hp') return 1;
       const next = lives - 1;
       if (next <= 0) {
         setSurvivalReason('lives');
@@ -579,7 +734,7 @@ export default function Home() {
     });
     setDrafts({});
     advanceSurvivalQuestion();
-  }, [advanceSurvivalQuestion, isBossStage]);
+  }, [advanceSurvivalQuestion, exam.id, exam.title, grade, isBossStage, questionIndex, questions, triggerBossPenalty]);
 
   const chooseAnswer = useCallback((value: AnswerValue) => {
     const currentQuestion = questions[questionIndex];
@@ -602,7 +757,7 @@ export default function Home() {
       setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
       recordCorrect();
     } else {
-      recordWrong(currentQuestion.id);
+      recordWrong(currentQuestion);
     }
   }, [answers, gameOver, lockedQuestion, mode, questionIndex, questions, recordCorrect, recordSurvivalCorrect, recordSurvivalWrong, recordWrong, survivalGameOver]);
 
@@ -619,7 +774,7 @@ export default function Home() {
       setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
       if (mode === 'practice') recordCorrect();
     } else {
-      recordWrong(currentQuestion.id);
+      recordWrong(currentQuestion);
     }
   }, [drafts, gameOver, mode, questionIndex, questions, recordCorrect, recordSurvivalCorrect, recordSurvivalWrong, recordWrong, survivalGameOver]);
 
@@ -640,6 +795,13 @@ export default function Home() {
 
   const submitExam = () => {
     if (!canSubmit) return;
+    const completionKey = `${grade}-${exam.id}`;
+    setCompletedExamKeys((current) => {
+      if (current.includes(completionKey)) return current;
+      setDuckCoins((coinsNow) => coinsNow + 20);
+      return [...current, completionKey];
+    });
+    setDailyStats((current) => ({ ...current, completed: current.completed + 1 }));
     if (mode === 'practice' && score === questions.length) {
       setArmorUnlocked(true);
       setArmorPoints(5);
@@ -714,7 +876,40 @@ export default function Home() {
   }, [availableExams.length, chooseAnswer, grade, mode, question, selectExam]);
 
   const resetExam = () => selectExam(examIndex);
-  const toggleFlag = () => setFlagged((items) => items.includes(question.id) ? items.filter((id) => id !== question.id) : [...items, question.id]);
+  const toggleFlag = () => {
+    const key = questionKey(question);
+    if (currentFlagged) {
+      setFlagVault((items) => items.filter((item) => item.key !== key));
+      setFlagged((items) => items.filter((id) => id !== question.id));
+      return;
+    }
+    const entry: FlagEntry = { key, grade, examId: exam.id, examTitle: exam.title, prompt: question.prompt, section: question.section, savedAt: Date.now() };
+    setFlagVault((items) => [entry, ...items.filter((item) => item.key !== key)].slice(0, 120));
+    setFlagged((items) => items.includes(question.id) ? items : [...items, question.id]);
+    setDailyStats((current) => ({ ...current, flags: current.flags + 1 }));
+    setDuckCoins((current) => current + 2);
+  };
+
+  const openSavedEntry = (entry: FlagEntry | WrongEntry) => {
+    const targetExams = examsByGrade[entry.grade];
+    const targetIndex = Math.max(0, targetExams.findIndex((item) => item.id === entry.examId));
+    switchGrade(entry.grade);
+    setMode('practice');
+    setExamIndex(targetIndex);
+    setFocusQuestionKey(entry.key);
+    setHubPanel(null);
+  };
+
+  const openJourneyStage = (group: MenuGroup | 'survival') => {
+    if (group === 'survival') {
+      switchMode('survival');
+      setHubPanel(null);
+      return;
+    }
+    const targetIndex = availableExams.findIndex((item) => item.menuGroup === group);
+    if (targetIndex >= 0) selectExam(targetIndex);
+    setHubPanel(null);
+  };
 
   const renderExamButton = (item: (typeof availableExams)[number], index: number) => (
     <button key={item.id} onClick={() => selectExam(index)} className={`group rounded-2xl px-3 py-2.5 text-left transition ${index === examIndex ? 'bg-sky-600 text-white shadow-md shadow-sky-100' : 'bg-sky-50 text-[#15324a] hover:bg-sky-100'}`}>
@@ -762,7 +957,7 @@ export default function Home() {
   );
 
   return (
-    <main className="min-h-screen bg-[#f7fbff] text-[#15324a]">
+    <main className={`min-h-screen bg-[#f7fbff] text-[#15324a] effects-${effectLevel}`}>
       <header className="sticky top-0 z-30 border-b border-sky-100 bg-white/92 px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -781,6 +976,18 @@ export default function Home() {
         <aside className="hidden self-start rounded-3xl border border-sky-100 bg-white p-4 shadow-sm lg:block">{examMenu}</aside>
 
         <section className="min-w-0" onContextMenu={openDictionary}>
+          <div className="mb-5 overflow-hidden rounded-[28px] border border-indigo-100 bg-gradient-to-r from-indigo-950 via-sky-900 to-cyan-800 text-white shadow-[0_18px_45px_rgba(30,64,175,.18)]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/15 px-5 py-4">
+              <div><p className="text-xs font-black uppercase tracking-[.2em] text-cyan-200">Adventure Hub</p><strong className="text-xl">Hành trình English {grade}</strong></div>
+              <div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1.5 rounded-full bg-amber-300 px-3 py-1.5 text-sm font-black text-amber-950"><Coins className="size-4"/> {duckCoins} Duck Coins</span><div className="flex rounded-full bg-white/10 p-1 text-[11px] font-bold"><span className="grid place-items-center px-2"><Settings2 className="size-3.5"/></span>{(['full', 'light', 'off'] as EffectLevel[]).map((level) => <button key={level} onClick={() => setEffectLevel(level)} className={`rounded-full px-2 py-1 ${effectLevel === level ? 'bg-white text-sky-900' : 'text-white/75 hover:bg-white/10'}`}>{level === 'full' ? 'Đầy đủ' : level === 'light' ? 'Nhẹ' : 'Tắt'}</button>)}</div></div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
+              <button onClick={() => setHubPanel('map')} className="group flex items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:-translate-y-0.5 hover:bg-white/20"><span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-300 text-emerald-950"><MapPinned/></span><span><b className="block">Bản đồ</b><small className="text-white/70">Chọn chặng học</small></span></button>
+              <button onClick={() => setHubPanel('vault')} className="group flex items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:-translate-y-0.5 hover:bg-white/20"><span className="grid h-11 w-11 place-items-center rounded-xl bg-amber-300 text-amber-950"><Archive/></span><span><b className="block">Vault cờ</b><small className="text-white/70">{flagVault.length} vị trí đã lưu</small></span></button>
+              <button onClick={() => setHubPanel('wrong')} className="group flex items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:-translate-y-0.5 hover:bg-white/20"><span className="grid h-11 w-11 place-items-center rounded-xl bg-rose-300 text-rose-950"><BookMarked/></span><span><b className="block">Sổ câu sai</b><small className="text-white/70">{wrongBook.length} câu cần ôn</small></span></button>
+              <button onClick={() => setHubPanel('missions')} className="group flex items-center gap-3 rounded-2xl bg-white/10 p-3 text-left transition hover:-translate-y-0.5 hover:bg-white/20"><span className="grid h-11 w-11 place-items-center rounded-xl bg-violet-300 text-violet-950"><Target/></span><span><b className="block">Nhiệm vụ</b><small className="text-white/70">{dailyDone}/3 hoàn thành</small></span></button>
+            </div>
+          </div>
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div><p className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-sky-700"><BookOpen className="size-4"/> English {grade} · {question.section}</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{exam.title}</h1></div>
             <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">Câu {questionIndex + 1} / {questions.length}</span>
@@ -836,15 +1043,17 @@ export default function Home() {
             </article>
           ) : (
             <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_16px_50px_rgba(24,95,140,.08)] sm:p-8">
-              <div className="mb-5 flex items-center justify-between gap-3"><span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">{question.skillArea ?? (question.section === 'Reading' ? `Bài đọc · ${exam.passageTitle}` : question.section === 'Writing' ? 'Writing' : 'Ngữ âm · Từ vựng · Ngữ pháp')}</span><button onClick={toggleFlag} className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${flagged.includes(question.id) ? 'bg-amber-100 text-amber-800' : 'text-slate-500 hover:bg-slate-50'}`}><Flag className="size-4" fill={flagged.includes(question.id) ? 'currentColor' : 'none'}/> {flagged.includes(question.id) ? 'Đã đánh dấu' : 'Đánh dấu'}</button></div>
+              <div className="mb-5 flex items-center justify-between gap-3"><span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">{question.skillArea ?? (question.section === 'Reading' ? `Bài đọc · ${exam.passageTitle}` : question.section === 'Writing' ? 'Writing' : 'Ngữ âm · Từ vựng · Ngữ pháp')}</span><button onClick={toggleFlag} className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${currentFlagged ? 'bg-amber-100 text-amber-800' : 'text-slate-500 hover:bg-slate-50'}`}><Flag className="size-4" fill={currentFlagged ? 'currentColor' : 'none'}/> {currentFlagged ? 'Đã cắm cờ' : 'Cắm cờ'}</button></div>
               {question.section === 'Reading' && (question.passage ?? exam.passage) && <div className="mb-6 max-h-72 overflow-y-auto rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-[15px] leading-7 text-slate-700"><strong className="mb-2 block text-amber-900">{question.passageTitle ?? exam.passageTitle}</strong>{question.passage ?? exam.passage}</div>}
               <ExerciseQuestion
-                question={question}
+                question={displayQuestion}
                 questionNumber={questionIndex + 1}
                 value={selected}
-                disabled={lockedQuestion === question.id || (mode === 'practice' && answers[question.id] !== undefined)}
+                disabled={lockedQuestion === question.id || (mode === 'practice' && answers[question.id] !== undefined) || (mode === 'survival' && (bossPenalty?.kind === 'keyboard' || bossPenalty?.kind === 'screen-lock'))}
                 practiceCorrect={mode === 'practice' && isQuestionCorrect(question, answers[question.id])}
                 showCheck={mode === 'practice' || mode === 'survival'}
+                progressiveHint={mode === 'practice' && question.skillArea === 'Vocabulary' && question.kind === 'typed' ? vocabHintText : undefined}
+                onRevealHint={mode === 'practice' && question.skillArea === 'Vocabulary' && question.kind === 'typed' ? () => setVocabHintSteps((current) => ({ ...current, [questionKey(question)]: Math.min(vocabHintAnswer.length, vocabHintStep + 1) })) : undefined}
                 onChange={chooseAnswer}
                 onCheck={checkTypedAnswer}
               />
@@ -882,10 +1091,14 @@ export default function Home() {
             </div>
             <div className="border-t border-rose-100 bg-rose-50 p-4"><div className="flex items-center justify-between text-sm"><strong className="text-rose-900">Máu còn lại</strong><span className="font-bold text-rose-700">{Math.max(0, maxDamage - damage)}/{maxDamage}</span></div><div className="mt-2 h-2.5 overflow-hidden rounded-full bg-rose-200"><div className="h-full bg-rose-500 transition-all" style={{ width: `${100 - damagePercent}%` }} /></div>{armorUnlocked && <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-300 bg-slate-900 px-3 py-2 text-xs text-white"><img src="duck-kevlar-v2.png" alt="Vịt mặc giáp bảo vệ" className="h-12 w-12 object-contain"/><span><strong className="block text-amber-300">Giáp Kevlar: {armorPoints}/5</strong>Giáp đỡ sai trước máu thật và không thể hồi bằng tủ thuốc.</span></div>}<div className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-xs leading-5 text-slate-600"><strong className="text-emerald-800">Kho: 🩹 {aidInventory.cotton} · 💊 {aidInventory.medicine} · 💉 {aidInventory.injection}</strong><br/>Mỗi 5 câu đúng nhận 1 vật phẩm. Mốc tiếp theo: {nextAidMilestone} câu.</div><Button onClick={() => setAidOpen(true)} disabled={damage === 0 || gameOver || Object.values(aidInventory).every((count) => count === 0)} className="mt-3 w-full bg-emerald-600 font-bold hover:bg-emerald-700">🧰 Mở tủ cấp cứu</Button></div>
           </div>}
-          <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{questions.map((item, index) => { const done = isAnswerComplete(item, answers[item.id]); const marked = flagged.includes(item.id); return <button aria-label={`Mở câu ${index + 1}`} key={item.id} onClick={() => setQuestionIndex(index)} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-700 ring-offset-2' : ''} ${marked ? 'bg-indigo-400 text-white' : done ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{index + 1}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-sky-500"/>Câu đã làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-200"/>Câu chưa làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-indigo-400"/>Đã đánh dấu để xem lại</span></div></div>
+          <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{questions.map((item, index) => { const done = isAnswerComplete(item, answers[item.id]); const marked = flagVault.some((saved) => saved.key === questionKey(item)); return <button aria-label={`Mở câu ${index + 1}`} key={item.id} onClick={() => setQuestionIndex(index)} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-700 ring-offset-2' : ''} ${marked ? 'bg-indigo-400 text-white' : done ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{marked && <Flag className="absolute right-0.5 top-0.5 size-3" fill="currentColor"/>}{index + 1}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-sky-500"/>Câu đã làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-200"/>Câu chưa làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-indigo-400"/>Cờ đã lưu trong Vault</span></div></div>
           <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Sparkles className="size-5 text-amber-600"/><strong className="text-amber-950">Từ vựng của Vịt</strong></div><button onClick={() => setVocabulary(randomVocabulary(grade))} className="rounded-full p-2 text-amber-700 transition hover:bg-amber-100" aria-label="Đổi ba từ vựng"><RefreshCw className="size-4"/></button></div><div className="mt-3 grid gap-3">{vocabulary.map((item) => <div key={item.word} className="rounded-2xl bg-white p-3 shadow-sm"><strong className="text-sky-800">{item.word}</strong><span className="ml-2 text-sm text-amber-800">{item.meaning}</span><p className="mt-1 text-sm leading-5 text-slate-600">{item.example}</p></div>)}</div></div>
         </aside>
       </div>
+      {hubPanel === 'map' && <dialog open className="fixed inset-0 z-[120] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/80 p-3 sm:p-6" aria-labelledby="map-title"><div className="w-full max-w-6xl overflow-hidden rounded-[30px] border-2 border-cyan-300 bg-slate-950 shadow-2xl"><div className="flex items-center justify-between gap-3 px-5 py-4 text-white"><div><p className="text-xs font-black uppercase tracking-[.2em] text-cyan-300">Learning Journey</p><h2 id="map-title" className="text-2xl font-black">Bản đồ English {grade}</h2></div><button onClick={() => setHubPanel(null)} className="rounded-full bg-white/10 p-2 hover:bg-white/20" aria-label="Đóng bản đồ"><X/></button></div><div className="relative aspect-[2/1] min-h-[330px] overflow-hidden bg-sky-200"><img src="learning-journey-map-v1.png" alt="Bản đồ hành trình học tiếng Anh" className="absolute inset-0 h-full w-full object-cover"/>{JOURNEY_STAGES.map((stage) => { const stageExams = stage.group === 'survival' ? [] : availableExams.filter((item) => item.menuGroup === stage.group); const completed = stage.group === 'survival' ? (survivalStage > 0 ? 1 : 0) : stageExams.filter((item) => completedExamKeys.includes(`${grade}-${item.id}`)).length; const total = stage.group === 'survival' ? 1 : stageExams.length; return <button key={stage.group} onClick={() => openJourneyStage(stage.group)} disabled={stage.group !== 'survival' && total === 0} className={`journey-node absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-4 p-1 text-center shadow-xl transition hover:scale-110 disabled:opacity-40 ${completed >= total && total > 0 ? 'border-emerald-300 bg-emerald-600 text-white' : 'border-amber-300 bg-white text-sky-950'}`} style={{ left: `${stage.position[0]}%`, top: `${stage.position[1]}%` }}><span className="block text-xl sm:text-2xl">{completed >= total && total > 0 ? '✓' : stage.icon}</span><b className="hidden whitespace-nowrap rounded-full bg-slate-950/80 px-2 py-0.5 text-[10px] text-white sm:block">{stage.label} · {completed}/{Math.max(1, total)}</b></button>; })}</div><div className="grid gap-2 bg-white p-4 sm:grid-cols-3 lg:grid-cols-7">{JOURNEY_STAGES.map((stage) => <button key={stage.group} onClick={() => openJourneyStage(stage.group)} className="rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-900 hover:bg-sky-100">{stage.icon} {stage.label}</button>)}</div></div></dialog>}
+      {hubPanel === 'vault' && <dialog open className="fixed inset-0 z-[120] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/75 p-4" aria-labelledby="vault-title"><div className="w-full max-w-3xl overflow-hidden rounded-[30px] border-2 border-amber-300 bg-white shadow-2xl"><div className="grid items-center bg-gradient-to-r from-indigo-950 to-sky-800 px-6 py-5 text-white sm:grid-cols-[170px_1fr_auto]"><img src="flag-vault-v1.png" alt="Vault chứa cờ và bản đồ" className="mx-auto h-32 w-40 object-contain sm:h-36"/><div><p className="text-xs font-black uppercase tracking-[.2em] text-amber-300">Flag Vault</p><h2 id="vault-title" className="text-3xl font-black">Kho cờ đã cắm</h2><p className="mt-1 text-sm text-sky-100">Mỗi lá cờ lưu chính xác câu hỏi để em quay lại luyện sau.</p></div><button onClick={() => setHubPanel(null)} className="absolute right-6 top-6 rounded-full bg-white/10 p-2 hover:bg-white/20 sm:static" aria-label="Đóng Vault"><X/></button></div><div className="max-h-[55vh] space-y-3 overflow-y-auto p-5">{flagVault.length === 0 ? <div className="rounded-2xl bg-amber-50 p-8 text-center text-amber-900"><Flag className="mx-auto mb-2 size-9"/><strong>Vault đang trống</strong><p className="mt-1 text-sm">Nhấn “Cắm cờ” trên một câu hỏi để lưu vào đây.</p></div> : flagVault.map((entry) => <div key={entry.key} className="flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/60 p-4"><span className="text-2xl">🚩</span><button onClick={() => openSavedEntry(entry)} className="min-w-0 flex-1 text-left"><span className="text-xs font-bold text-amber-700">English {entry.grade} · {entry.section}</span><strong className="mt-1 block line-clamp-2 text-slate-900">{entry.prompt}</strong><span className="mt-1 block text-xs text-slate-500">{entry.examTitle}</span></button><button onClick={() => setFlagVault((items) => items.filter((item) => item.key !== entry.key))} className="rounded-full p-2 text-slate-400 hover:bg-rose-100 hover:text-rose-700" aria-label="Xóa cờ"><X className="size-4"/></button></div>)}</div></div></dialog>}
+      {hubPanel === 'wrong' && <dialog open className="fixed inset-0 z-[120] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/75 p-4" aria-labelledby="wrong-title"><div className="w-full max-w-3xl overflow-hidden rounded-[30px] border-2 border-rose-300 bg-white shadow-2xl"><div className="flex items-center justify-between gap-4 bg-rose-700 px-6 py-5 text-white"><div><p className="text-xs font-black uppercase tracking-[.2em] text-rose-200">Review Book</p><h2 id="wrong-title" className="text-2xl font-black">Sổ câu sai · {wrongBook.length} câu</h2></div><button onClick={() => setHubPanel(null)} className="rounded-full bg-white/10 p-2 hover:bg-white/20"><X/></button></div><div className="max-h-[65vh] space-y-3 overflow-y-auto p-5">{wrongBook.length === 0 ? <p className="rounded-2xl bg-emerald-50 p-8 text-center font-bold text-emerald-800">Tuyệt vời! Chưa có câu nào cần ôn lại.</p> : wrongBook.map((entry) => <div key={entry.key} className="flex items-start gap-3 rounded-2xl border border-rose-100 p-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-100 font-black text-rose-700">×{entry.mistakes}</span><button onClick={() => openSavedEntry(entry)} className="min-w-0 flex-1 text-left"><span className="text-xs font-bold text-rose-700">English {entry.grade} · {entry.section}</span><strong className="mt-1 block line-clamp-2 text-slate-900">{entry.prompt}</strong><span className="mt-1 block text-xs text-slate-500">Mở bài để luyện lại</span></button><button onClick={() => setWrongBook((items) => items.filter((item) => item.key !== entry.key))} className="rounded-full p-2 text-slate-400 hover:bg-slate-100" aria-label="Xóa khỏi sổ"><X className="size-4"/></button></div>)}</div></div></dialog>}
+      {hubPanel === 'missions' && <dialog open className="fixed inset-0 z-[120] m-0 grid h-screen w-screen max-w-none place-items-center bg-slate-950/75 p-4" aria-labelledby="mission-title"><div className="w-full max-w-xl rounded-[30px] border-2 border-violet-300 bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[.2em] text-violet-600">Daily Missions</p><h2 id="mission-title" className="text-2xl font-black text-slate-900">Nhiệm vụ hôm nay</h2><p className="mt-1 text-sm text-slate-500">Tiến độ tự đặt lại vào ngày mới.</p></div><button onClick={() => setHubPanel(null)} className="rounded-full bg-slate-100 p-2"><X/></button></div><div className="mt-6 space-y-3">{dailyMissions.map((mission) => { const percent = Math.min(100, mission.value / mission.target * 100); return <div key={mission.label} className={`rounded-2xl border p-4 ${percent === 100 ? 'border-emerald-200 bg-emerald-50' : 'border-violet-100 bg-violet-50'}`}><div className="flex items-center justify-between"><strong>{mission.icon} {mission.label}</strong><span className="font-bold">{Math.min(mission.value, mission.target)}/{mission.target} {percent === 100 && '✓'}</span></div><div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${percent}%` }}/></div></div>; })}</div><div className="mt-5 rounded-2xl bg-amber-50 p-4 text-center text-amber-900"><Coins className="mx-auto size-7"/><strong className="mt-1 block">1 câu đúng = 1 xu · Cắm cờ mới = 2 xu · Hoàn thành bài mới = 20 xu</strong></div></div></dialog>}
       {mode === 'practice' && damage > 0 && <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[60] overflow-hidden transition-all duration-500" style={{ background: `rgba(20,10,14,${Math.min(.34, damagePercent / 290)})` }}>
         {Array.from({ length: Math.min(damage, maxDamage) }, (_, index) => <img key={index} src="glass-crack-v2.png" alt="" className="glass-crack absolute object-contain drop-shadow-[0_5px_12px_rgba(0,0,0,.55)]" style={{ left: `${-5 + ((index * 37) % 83)}%`, top: `${-8 + ((index * 29) % 75)}%`, width: `${190 + (index % 3) * 55}px`, rotate: `${(index * 47) % 360}deg` }}/>) }
       </div>}
@@ -894,10 +1107,15 @@ export default function Home() {
       {mode === 'survival' && screenBlurred && <div aria-hidden="true" className="screen-blur pointer-events-none fixed inset-0 z-[64] bg-slate-100/25 backdrop-blur-md"/>}
       {mode === 'survival' && agentNotice && <div role="status" className="pointer-events-none fixed inset-0 z-[95] grid place-items-center bg-slate-950/45 p-4"><div className="agent-pop text-center"><img src="duck-pencil-agent-v2.png" alt="Vịt điệp viên cầm bút chì" className="mx-auto max-h-[70vh] object-contain drop-shadow-2xl"/><p className="-mt-8 inline-flex rounded-full bg-amber-300 px-5 py-2 text-lg font-black text-slate-950 shadow-xl">BÚT CHÌ CLEAR MÀN HÌNH!</p></div></div>}
       {mode === 'survival' && isBossStage && !survivalEnded && <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[57] grid place-items-center overflow-hidden"><img src="chicken-boss.png" alt="" className="max-h-[82vh] max-w-[82vw] object-contain opacity-25 drop-shadow-2xl transition-transform duration-700" style={{ transform: `scale(${0.7 + stageCorrect * 0.055 + (3 - survivalLives) * 0.12})` }}/></div>}
+      {mode === 'survival' && bossPenalty && bossPenalty.asset && <div role="status" className="pointer-events-none fixed inset-0 z-[88] grid place-items-center bg-slate-950/70 p-4"><div className="food-penalty text-center"><img src={bossPenalty.asset} alt={bossPenalty.label} className="mx-auto max-h-[70vh] max-w-[90vw] object-contain drop-shadow-2xl"/><strong className="mt-2 block text-4xl font-black text-amber-300 drop-shadow-xl">{bossPenalty.label}</strong><span className="mt-2 inline-flex rounded-full bg-white/15 px-4 py-1 font-bold text-white">{bossPenalty.seconds}s</span></div></div>}
+      {mode === 'survival' && bossPenalty && !bossPenalty.asset && bossPenalty.kind !== 'screen-lock' && <div role="status" className="pointer-events-none fixed inset-x-0 top-24 z-[88] flex justify-center px-4"><div className="rounded-2xl border-2 border-rose-300 bg-slate-950/95 px-6 py-4 text-center text-white shadow-2xl"><p className="text-xs font-black uppercase tracking-[.2em] text-rose-300">Kỹ năng Boss</p><strong className="mt-1 block text-xl">{bossPenalty.label}</strong><span className="text-sm text-slate-300">Còn {bossPenalty.seconds}s</span></div></div>}
+      {mode === 'survival' && bossPenalty?.kind === 'screen-lock' && <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/95 p-5 text-center text-white"><div><div className="mx-auto grid h-28 w-28 place-items-center rounded-full border-4 border-rose-400 bg-rose-950 text-6xl">🔒</div><img src="chicken-boss.png" alt="Boss Gà khóa màn hình" className="mx-auto mt-3 h-64 max-w-[80vw] object-contain"/><strong className="block text-4xl font-black text-rose-300">MÀN HÌNH ĐÃ BỊ KHÓA</strong><p className="mt-3 text-xl">Boss sẽ mở lại sau {bossPenalty.seconds} giây</p></div></div>}
       {mode === 'survival' && stageUpNotice && <div role="status" className="pointer-events-none fixed inset-0 z-[90] grid place-items-center bg-sky-950/35 p-4"><div className="rounded-[28px] border-4 border-amber-300 bg-slate-950/95 px-8 py-7 text-center text-white shadow-2xl"><p className="text-sm font-black uppercase tracking-[.22em] text-amber-300">Qua màn!</p><p className="mt-2 text-3xl font-black">{stageUpNotice}</p></div></div>}
       {mode === 'practice' && aidDropNotice && <div role="status" className="pointer-events-none fixed inset-x-0 top-24 z-[92] flex justify-center px-4"><div className="rounded-2xl border-2 border-emerald-300 bg-slate-950/95 px-5 py-4 text-center text-white shadow-2xl"><p className="text-xs font-black uppercase tracking-[.2em] text-emerald-300">Túi cứu thương</p><p className="mt-1 text-lg font-black">Nhận {AID_ITEMS.find((item) => item.kind === aidDropNotice)?.icon} {AID_ITEMS.find((item) => item.kind === aidDropNotice)?.name}</p></div></div>}
       {(mode === 'practice' || mode === 'survival') && hitPulse > 0 && <div key={hitPulse} aria-hidden="true" className="hit-flash pointer-events-none fixed inset-0 z-[65] grid place-items-center bg-rose-700/35"><div className="h-32 w-32 rounded-full border-[14px] border-white/55 shadow-[0_0_80px_32px_rgba(225,29,72,.75)]" /></div>}
-      {hintOpen && !gameOver && lockedQuestion === question.id && <dialog open className="fixed inset-0 z-[70] m-0 grid h-screen w-screen max-w-none place-items-center bg-slate-950/45 p-4" aria-labelledby="hint-title"><div className="relative w-full max-w-lg overflow-hidden rounded-[28px] border border-amber-200 bg-white p-6 shadow-2xl">{lockSeconds > 0 && <div className="trex-pop absolute -right-6 -top-5 z-0 text-center"><img src="trex-grrr-v2.png" alt="Đầu T-rex gầm" className="h-36 w-36 object-contain"/><strong className="-mt-4 block -rotate-6 text-2xl font-black tracking-wider text-rose-700 drop-shadow-sm">GRRRRRRRR</strong></div>}<div className="relative z-10 flex items-center gap-3"><img src="duck-learn.png" alt="Mascot vịt đưa gợi ý" className="h-16 w-16 rounded-2xl object-cover"/><div><p className="text-sm font-bold uppercase tracking-wider text-amber-700">Sai lần {wrongAttempts[question.id] ?? 1}</p><h2 id="hint-title" className="text-xl font-extrabold text-slate-900">Chưa đúng — xem gợi ý nhé</h2></div></div><p className="relative z-10 mt-4 rounded-2xl bg-amber-50/95 p-4 leading-7 text-slate-700">{question.hint ?? 'Read the instruction carefully. Check the tense marker, word form, sentence structure, or the exact evidence in the passage before trying again.'}</p><p className="relative z-10 mt-3 text-sm text-slate-500">Đáp án chưa được tiết lộ. Câu trả lời sẽ được xóa để em làm lại. {lockSeconds > 0 ? `Hệ thống đang khóa câu trong ${lockSeconds} giây.` : ''}</p><Button onClick={retryAfterHint} disabled={lockSeconds > 0} autoFocus className="relative z-10 mt-5 w-full rounded-xl bg-amber-500 font-bold text-white hover:bg-amber-600 disabled:bg-slate-400">{lockSeconds > 0 ? `🔒 Chờ ${lockSeconds}s` : 'Đã hiểu · Làm lại'}</Button></div></dialog>}
+      {hintOpen && !gameOver && lockedQuestion === question.id && currentWrongAttempt === 1 && <dialog open className="fixed inset-0 z-[70] m-0 grid h-screen w-screen max-w-none place-items-center bg-slate-950/45 p-4" aria-labelledby="hint-title"><div className="w-full max-w-lg rounded-[28px] border border-amber-200 bg-white p-6 shadow-2xl"><div className="flex items-center gap-3"><img src="duck-learn.png" alt="Mascot vịt đưa gợi ý" className="h-16 w-16 rounded-2xl object-cover"/><div><p className="text-sm font-bold uppercase tracking-wider text-amber-700">Sai lần 1</p><h2 id="hint-title" className="text-xl font-extrabold text-slate-900">Chưa đúng — xem gợi ý nhé</h2></div></div><p className="mt-4 rounded-2xl bg-amber-50 p-4 leading-7 text-slate-700">{question.hint ?? 'Read the instruction carefully. Check the tense marker, word form, sentence structure, or the exact evidence in the passage before trying again.'}</p><p className="mt-3 text-sm text-slate-500">Đáp án chưa được tiết lộ. Câu trả lời sẽ được xóa để em làm lại.</p><Button onClick={retryAfterHint} autoFocus className="mt-5 w-full rounded-xl bg-amber-500 font-bold text-white hover:bg-amber-600">Đã hiểu · Làm lại</Button></div></dialog>}
+      {hintOpen && !gameOver && lockedQuestion === question.id && currentWrongAttempt === 2 && <dialog open className="fixed inset-0 z-[75] m-0 h-screen w-screen max-w-none overflow-hidden bg-slate-950" aria-label="T-rex phạt thời gian"><img src="trex-grrr-v2.png" alt="T-rex gầm chiếm toàn màn hình" className="trex-fullscreen absolute inset-0 h-full w-full object-contain"/><div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent px-4 pb-8 pt-28 text-center text-white"><strong className="block text-5xl font-black tracking-[.12em] text-rose-400 drop-shadow-2xl sm:text-7xl">GRRRRRRRR</strong><Button onClick={retryAfterHint} disabled={lockSeconds > 0} className="mt-5 min-w-64 rounded-xl bg-rose-600 py-6 text-lg font-black hover:bg-rose-500 disabled:bg-slate-600">{lockSeconds > 0 ? `🔒 T-rex khóa ${lockSeconds}s` : 'Thoát và làm lại'}</Button></div></dialog>}
+      {hintOpen && !gameOver && lockedQuestion === question.id && currentWrongAttempt >= 3 && <dialog open className="fixed inset-0 z-[75] m-0 grid h-screen w-screen max-w-none place-items-center overflow-hidden bg-gradient-to-b from-amber-950 to-slate-950 p-4" aria-label="Vịt quay Bắc Kinh"><div className="food-penalty text-center"><img src="peking-duck-v1.png" alt="Vịt quay Bắc Kinh" className="mx-auto max-h-[72vh] max-w-[92vw] object-contain drop-shadow-2xl"/><strong className="block text-3xl font-black text-amber-300 sm:text-5xl">VỊT QUAY BẮC KINH</strong><Button onClick={retryAfterHint} disabled={lockSeconds > 0} className="mt-5 min-w-64 rounded-xl bg-amber-500 py-6 text-lg font-black text-slate-950 hover:bg-amber-400 disabled:bg-slate-600 disabled:text-white">{lockSeconds > 0 ? `🔒 Chờ ${lockSeconds}s` : 'Làm lại câu này'}</Button></div></dialog>}
       {aidOpen && !gameOver && <dialog open className="fixed inset-0 z-[80] m-0 grid h-screen w-screen max-w-none place-items-center bg-emerald-950/55 p-4" aria-labelledby="aid-title"><div className="w-full max-w-xl rounded-[28px] border-4 border-emerald-400 bg-slate-950 p-6 text-white shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-[.18em] text-emerald-300">Medical crate</p><h2 id="aid-title" className="text-2xl font-black">🧰 Tủ cấp cứu</h2><p className="mt-1 text-sm text-slate-300">Cứ 5 câu đúng sẽ rơi một vật phẩm: từ 5 câu có bông băng; từ 10 câu có thể ra thuốc cấp 2; từ 20 câu có thể ra ống tiêm cấp 3. Chọn một món để hồi máu.</p></div><button onClick={() => setAidOpen(false)} className="rounded-full bg-white/10 p-2 hover:bg-white/20" aria-label="Đóng tủ cấp cứu"><X className="size-5"/></button></div><div className="mt-5 grid gap-3 sm:grid-cols-3">{AID_ITEMS.map((item) => <button key={item.kind} onClick={() => consumeAid(item.kind)} disabled={aidInventory[item.kind] <= 0 || damage <= 0} className={`rounded-2xl border-2 p-4 text-left transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-35 ${item.color}`}><span className="text-4xl">{item.icon}</span><strong className="mt-2 block">{item.name}</strong><span className="text-sm">Hồi {item.heal} máu · Còn {aidInventory[item.kind]}</span></button>)}</div><div className="mt-5 rounded-2xl bg-white/10 p-4"><div className="flex justify-between text-sm"><span>Mức thương tích</span><strong>{damage}/{maxDamage}</strong></div><div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-700"><div className="h-full bg-rose-500" style={{ width: `${damagePercent}%` }}/></div></div></div></dialog>}
       {gameOver && <dialog open className="fixed inset-0 z-[100] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/90 p-4" aria-labelledby="game-over-title"><div className="w-full max-w-md rounded-[28px] border-2 border-rose-500 bg-slate-900 p-6 text-center text-white shadow-2xl"><img src="duck-hospital.png" alt="Vịt băng bó đang hồi phục trong bệnh viện" className="mx-auto h-48 w-48 object-contain drop-shadow-2xl"/><p className="mt-2 text-sm font-bold uppercase tracking-[.22em] text-rose-300">Vịt cần hồi phục</p><h2 id="game-over-title" className="mt-2 text-3xl font-black">Màn hình đã bị che hoàn toàn</h2><p className="mt-3 leading-7 text-slate-300">Số lần sai đã đạt 20% số câu của bài. Vịt đã được băng bó an toàn; em cần làm lại từ đầu và dùng tủ cấp cứu sớm hơn ở lượt tới.</p><Button onClick={resetExam} autoFocus className="mt-5 w-full bg-rose-600 py-6 text-base font-black hover:bg-rose-700"><RotateCcw/> Làm lại từ đầu</Button></div></dialog>}
       {survivalGameOver && <dialog open className="fixed inset-0 z-[110] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/90 p-4" aria-labelledby="survival-over-title"><div className="w-full max-w-lg rounded-[30px] border-2 border-amber-400 bg-slate-900 p-6 text-center text-white shadow-2xl"><div className="grid grid-cols-2 items-end gap-2"><img src="duck-hospital.png" alt="Vịt đang hồi phục" className="h-44 w-full object-contain"/><img src={isBossStage ? 'chicken-boss.png' : 'chicken-army.png'} alt={isBossStage ? 'Gà Boss' : 'Quân đội gà'} className="h-44 w-full object-contain"/></div><p className="mt-2 text-sm font-bold uppercase tracking-[.22em] text-amber-300">Survival kết thúc</p><h2 id="survival-over-title" className="mt-2 text-3xl font-black">{survivalReason === 'time' ? 'Hết thời gian!' : 'Vịt đã hết máu!'}</h2><p className="mt-3 leading-7 text-slate-300">Bạn đã tới màn {survivalStage + 1} · {stageName}, đạt chuỗi cao nhất {bestStreak}. Bắt đầu lại với 02:00 và 5 máu nhé.</p><Button onClick={resetExam} autoFocus className="mt-5 w-full bg-amber-500 py-6 text-base font-black text-slate-950 hover:bg-amber-400"><RotateCcw/> Chơi Survival lại</Button></div></dialog>}

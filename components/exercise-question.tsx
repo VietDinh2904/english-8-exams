@@ -33,7 +33,7 @@ function InlineTemplate({ question, values, disabled, onChange }: { question: Qu
   </div>;
 }
 
-export function ExerciseQuestion({ question, questionNumber, value, disabled, practiceCorrect, showCheck, onChange, onCheck }: { question: Question; questionNumber: number; value: AnswerValue | undefined; disabled: boolean; practiceCorrect: boolean; showCheck: boolean; onChange: (value: AnswerValue) => void; onCheck: () => void }) {
+export function ExerciseQuestion({ question, questionNumber, value, disabled, practiceCorrect, showCheck, progressiveHint, onRevealHint, onChange, onCheck }: { question: Question; questionNumber: number; value: AnswerValue | undefined; disabled: boolean; practiceCorrect: boolean; showCheck: boolean; progressiveHint?: string; onRevealHint?: () => void; onChange: (value: AnswerValue) => void; onCheck: () => void }) {
   const isTrueFalse = question.options.length === 2 && question.options[0] === 'True' && question.options[1] === 'False' && question.kind !== 'typed';
   if (question.kind === 'typed' || question.kind === 'cloze-dropdown') {
     const values = Array.isArray(value) ? value : value === undefined ? [] : [String(value)];
@@ -41,6 +41,7 @@ export function ExerciseQuestion({ question, questionNumber, value, disabled, pr
       {question.template && <p className="text-lg font-semibold leading-relaxed">{question.prompt}</p>}
       {question.givenWord && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3"><span className="text-sm font-bold uppercase tracking-wide text-amber-700">Given word</span><strong className="mt-1 block text-xl tracking-wide text-amber-950">{question.givenWord}</strong></div>}
       <InlineTemplate question={question} values={values} disabled={disabled} onChange={onChange} />
+      {onRevealHint && <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3"><Button type="button" variant="outline" onClick={onRevealHint} disabled={disabled} className="rounded-xl border-violet-300 text-violet-800">💡 Hint ký tự</Button>{progressiveHint && <strong className="font-mono text-lg tracking-[.18em] text-violet-950">{progressiveHint}</strong>}<span className="text-xs text-violet-700">Mỗi lần bấm sẽ mở thêm đúng 1 ký tự.</span></div>}
       {showCheck && !practiceCorrect && <Button type="button" onClick={onCheck} disabled={disabled || !Array.from({ length: Array.isArray(question.answer) ? question.answer.length : 1 }, (_, index) => values[index] ?? '').every((item) => item.trim())} className="rounded-xl bg-sky-600">Kiểm tra câu trả lời</Button>}
     </div>;
   }
