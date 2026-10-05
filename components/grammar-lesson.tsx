@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { GrammarLesson as GrammarLessonData } from '@/lib/grammar-lessons9';
 import { unitEnrichment } from '@/lib/unit-enrichment';
 
-export function GrammarLesson({ grade, lesson }: { grade: 6 | 7 | 8 | 9 | 10 | 11 | 12; lesson: GrammarLessonData }) {
+export function GrammarLesson({ grade, lesson, vocabularyReviewed = false, onVocabularyReviewed }: { grade: 6 | 7 | 8 | 9 | 10 | 11 | 12; lesson: GrammarLessonData; vocabularyReviewed?: boolean; onVocabularyReviewed?: () => void }) {
   const unit = lesson.unit;
   const enrichment = unitEnrichment[grade][unit];
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -54,6 +54,9 @@ export function GrammarLesson({ grade, lesson }: { grade: 6 | 7 | 8 | 9 | 10 | 1
               <td lang="en" className="px-4 py-3 text-slate-700">{item.example}</td>
             </tr>)}</tbody>
           </table>
+        </div>
+        <div className={`border-t p-4 sm:px-5 ${vocabularyReviewed ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+          {vocabularyReviewed ? <p className="font-semibold text-emerald-900">✓ Đã review Vocabulary — câu kiểm tra nghĩa từ ở Looking Back đã được mở.</p> : <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-medium text-amber-950">Đọc từ, nghĩa, từ loại và ví dụ trước khi mở bài kiểm tra Looking Back.</p><button type="button" onClick={onVocabularyReviewed} className="rounded-xl bg-amber-500 px-4 py-2.5 font-bold text-white hover:bg-amber-600">Tôi đã review Vocabulary</button></div>}
         </div>
       </section>}
       {lesson.topics.map((topic) => <section key={topic.title} className="rounded-2xl border border-sky-100 bg-white p-4 sm:p-5">

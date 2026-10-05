@@ -182,13 +182,19 @@ function isTypedVocabularyQuestion(question: Question) {
   return question.kind === 'typed' && (question.skillArea === 'Vocabulary' || /unit word|vocabulary|missing word|correct word/i.test(`${question.prompt} ${question.template ?? ''}`));
 }
 
-function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, targetCount: number, seenBefore: Set<string>, pinnedKey?: string | null, excludeTypedVocabulary = false) {
+function isLookingBackVocabularyQuestion(question: Question) {
+  return question.skillArea === 'Looking Back' && /means?|meaning|key words?|vocabulary|unit word|best word|correct word/i.test(`${question.prompt} ${question.template ?? ''} ${question.explanation}`);
+}
+
+function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, targetCount: number, seenBefore: Set<string>, pinnedKey?: string | null, excludeTypedVocabulary = false, selectionOnly = false, reviewedVocabularyExamIds: Set<number> = new Set()) {
   const sourcePool = allExams.flatMap((source, sourceIndex) => source.questions.map((question) => ({
     ...question,
     passage: question.section === 'Reading' ? source.passage : undefined,
     passageTitle: question.section === 'Reading' ? source.passageTitle : undefined,
     sourceIndex,
-  }))).filter((question) => !(excludeTypedVocabulary && isTypedVocabularyQuestion(question)));
+  }))).filter((question) => !(excludeTypedVocabulary && isTypedVocabularyQuestion(question)))
+    .filter((question) => !(selectionOnly && (question.kind === 'typed' || question.kind === 'cloze-dropdown' || question.options.length < 2)))
+    .filter((question) => !(isLookingBackVocabularyQuestion(question) && !reviewedVocabularyExamIds.has(allExams[question.sourceIndex].id)));
   const unique = new Map<string, Question & { sourceIndex: number }>();
   for (const item of sourcePool) if (!unique.has(questionKey(item))) unique.set(questionKey(item), item);
   const priority = (items: (Question & { sourceIndex: number })[]) => [
@@ -330,6 +336,7 @@ export default function Home() {
   const [bossPenalty, setBossPenalty] = useState<BossPenalty | null>(null);
   const [ownedLoadout, setOwnedLoadout] = useState<string[]>([]);
   const [equippedLoadout, setEquippedLoadout] = useState<Loadout>(STARTER_LOADOUT);
+  const [reviewedVocabularyKeys, setReviewedVocabularyKeys] = useState<string[]>([]);
   const availableExams = examsByGrade[grade];
   const exam = availableExams[examIndex];
   const selectedUnit = unitNumber(exam, grade);
@@ -338,7 +345,8 @@ export default function Home() {
       ? extendedGrammarLessons[grade][selectedUnit]
       : grade === 8 ? grammarLessons8[selectedUnit] : grade === 9 ? grammarLessons9[selectedUnit] : grammarLessons10[selectedUnit]
     : undefined;
-  const questions = useMemo(() => buildMixedQuestions(exam, availableExams, examIndex, mode === 'practice' ? exam.questions.length : 40, seenAtSelection, focusQuestionKey, mode === 'test'), [availableExams, exam, examIndex, focusQuestionKey, mode, seenAtSelection]);
+  const reviewedVocabularyExamIds = useMemo(() => new Set(availableExams.filter((item) => reviewedVocabularyKeys.includes(`${grade}-${item.id}`)).map((item) => item.id)), [availableExams, grade, reviewedVocabularyKeys]);
+  const questions = useMemo(() => buildMixedQuestions(exam, availableExams, examIndex, mode === 'practice' ? exam.questions.length : 40, seenAtSelection, focusQuestionKey, mode === 'test', mode === 'survival', reviewedVocabularyExamIds), [availableExams, exam, examIndex, focusQuestionKey, mode, reviewedVocabularyExamIds, seenAtSelection]);
   const question = questions[questionIndex];
   const selected = drafts[question.id] ?? answers[question.id];
   const displayQuestion = useMemo<Question>(() => bossPenalty?.kind === 'extra-options' && question.kind !== 'typed' && question.kind !== 'cloze-dropdown' && question.options.length >= 2
@@ -397,6 +405,7 @@ export default function Home() {
       setEffectLevel((window.localStorage.getItem('english-moet-effects') as EffectLevel | null) ?? 'full');
       setOwnedLoadout(JSON.parse(window.localStorage.getItem('english-moet-owned-loadout') ?? '[]') as string[]);
       setEquippedLoadout({ ...STARTER_LOADOUT, ...JSON.parse(window.localStorage.getItem('english-moet-equipped-loadout') ?? '{}') as Partial<Loadout> });
+      setReviewedVocabularyKeys(JSON.parse(window.localStorage.getItem('english-moet-reviewed-vocabulary') ?? '[]') as string[]);
       setDailyStats(storedDaily?.date === today ? storedDaily : { date: today, correct: 0, flags: 0, completed: 0 });
     } catch { /* localStorage is optional */ }
     setStorageReady(true);
@@ -413,8 +422,9 @@ export default function Home() {
       window.localStorage.setItem('english-moet-daily', JSON.stringify(dailyStats));
       window.localStorage.setItem('english-moet-owned-loadout', JSON.stringify(ownedLoadout));
       window.localStorage.setItem('english-moet-equipped-loadout', JSON.stringify(equippedLoadout));
+      window.localStorage.setItem('english-moet-reviewed-vocabulary', JSON.stringify(reviewedVocabularyKeys));
     } catch { /* localStorage is optional */ }
-  }, [completedExamKeys, dailyStats, duckCoins, effectLevel, equippedLoadout, flagVault, ownedLoadout, storageReady, wrongBook]);
+  }, [completedExamKeys, dailyStats, duckCoins, effectLevel, equippedLoadout, flagVault, ownedLoadout, reviewedVocabularyKeys, storageReady, wrongBook]);
 
   useEffect(() => {
     if (!question) return;
@@ -1065,7 +1075,7 @@ export default function Home() {
             <button onClick={() => switchMode('survival')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'survival' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-600 hover:bg-amber-50'}`}>Survival</button>
           </div>
           {exam.sourceNote && <p className="mb-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900"><strong>Nguồn ôn tập:</strong> {exam.sourceNote}</p>}
-          {unitLesson && (mode === 'practice' || submitted) && <GrammarLesson key={`${grade}-${exam.id}`} grade={grade} lesson={unitLesson} />}
+          {unitLesson && (mode === 'practice' || submitted) && <GrammarLesson key={`${grade}-${exam.id}`} grade={grade} lesson={unitLesson} vocabularyReviewed={reviewedVocabularyKeys.includes(`${grade}-${exam.id}`)} onVocabularyReviewed={() => setReviewedVocabularyKeys((current) => current.includes(`${grade}-${exam.id}`) ? current : [...current, `${grade}-${exam.id}`])} />}
           {exam.reviewNotes && !unitLesson && <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
             <summary className="cursor-pointer px-5 py-4 font-bold text-amber-950">Kiến thức cần nhớ trước khi luyện</summary>
             <div className="grid gap-3 border-t border-amber-200 p-4 sm:grid-cols-2">
