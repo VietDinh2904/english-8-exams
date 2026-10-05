@@ -89,6 +89,7 @@ const BOSS_FOOD_EFFECTS: Record<Extract<BossPenaltyKind, 'duck-salad' | 'duck-po
   'peking-duck': { label: 'Vịt quay Bắc Kinh!', asset: 'peking-duck-v1.png' },
   'duck-bamboo': { label: 'Vịt kho măng!', asset: 'duck-bamboo-v1.png' },
 };
+const DUCK_PUNISHMENTS = Object.values(BOSS_FOOD_EFFECTS);
 const STARTER_LOADOUT: Loadout = { head: null, outfit: null, weapon: null };
 const LOADOUT_ITEMS: LoadoutItem[] = [
   { id: 'cap-scout', name: 'Mũ trinh sát', slot: 'head', icon: '🧢', price: 15, rarity: 'Phổ thông', color: 'from-sky-500 to-cyan-400' },
@@ -177,13 +178,17 @@ function questionFormat(question: Question) {
   return 'mcq';
 }
 
+function isTypedVocabularyQuestion(question: Question) {
+  return question.kind === 'typed' && (question.skillArea === 'Vocabulary' || /unit word|vocabulary|missing word|correct word/i.test(`${question.prompt} ${question.template ?? ''}`));
+}
+
 function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, targetCount: number, seenBefore: Set<string>, pinnedKey?: string | null, excludeTypedVocabulary = false) {
   const sourcePool = allExams.flatMap((source, sourceIndex) => source.questions.map((question) => ({
     ...question,
     passage: question.section === 'Reading' ? source.passage : undefined,
     passageTitle: question.section === 'Reading' ? source.passageTitle : undefined,
     sourceIndex,
-  }))).filter((question) => !(excludeTypedVocabulary && question.skillArea === 'Vocabulary' && question.kind === 'typed'));
+  }))).filter((question) => !(excludeTypedVocabulary && isTypedVocabularyQuestion(question)));
   const unique = new Map<string, Question & { sourceIndex: number }>();
   for (const item of sourcePool) if (!unique.has(questionKey(item))) unique.set(questionKey(item), item);
   const priority = (items: (Question & { sourceIndex: number })[]) => [
@@ -361,14 +366,18 @@ export default function Home() {
     { label: 'Hoàn thành 1 bài', value: dailyStats.completed, target: 1, icon: '🏆' },
   ];
   const dailyDone = dailyMissions.filter((item) => item.value >= item.target).length;
-  const vocabHintAnswer = question.skillArea === 'Vocabulary' && question.kind === 'typed'
+  const isTypedVocabulary = isTypedVocabularyQuestion(question);
+  const vocabHintAnswer = isTypedVocabulary
     ? String(Array.isArray(question.answer) ? question.answer[0] ?? '' : question.answer)
     : '';
-  const vocabHintStep = vocabHintSteps[questionKey(question)] ?? 0;
+  const vocabHintStep = vocabHintSteps[questionKey(question)] ?? Math.min(2, vocabHintAnswer.length);
+  const vocabularyPool = grade === 6 || grade === 7 || grade === 11 || grade === 12 ? extendedVocabulary[grade] : vocabularyByGrade[grade];
+  const vocabHintMeaning = vocabularyPool.find((item) => item.word.toLocaleLowerCase() === vocabHintAnswer.trim().toLocaleLowerCase())?.meaning;
   const vocabHintText = vocabHintAnswer
     ? [...vocabHintAnswer].map((character, index) => /[a-z]/i.test(character) ? index < vocabHintStep ? character : '_' : character).join(' ')
     : '';
   const currentWrongAttempt = wrongAttempts[question.id] ?? 1;
+  const thirdWrongPunishment = DUCK_PUNISHMENTS[Math.abs(question.id + currentWrongAttempt) % DUCK_PUNISHMENTS.length];
 
   useEffect(() => {
     try {
@@ -1105,8 +1114,9 @@ export default function Home() {
                 disabled={lockedQuestion === question.id || (mode === 'practice' && answers[question.id] !== undefined) || (mode === 'survival' && (bossPenalty?.kind === 'keyboard' || bossPenalty?.kind === 'screen-lock'))}
                 practiceCorrect={mode === 'practice' && isQuestionCorrect(question, answers[question.id])}
                 showCheck={mode === 'practice' || mode === 'survival'}
-                progressiveHint={mode === 'practice' && question.skillArea === 'Vocabulary' && question.kind === 'typed' ? vocabHintText : undefined}
-                onRevealHint={mode === 'practice' && question.skillArea === 'Vocabulary' && question.kind === 'typed' ? () => setVocabHintSteps((current) => ({ ...current, [questionKey(question)]: Math.min(vocabHintAnswer.length, vocabHintStep + 1) })) : undefined}
+                progressiveHint={mode === 'practice' && isTypedVocabulary ? vocabHintText : undefined}
+                hintMeaning={mode === 'practice' && isTypedVocabulary ? vocabHintMeaning : undefined}
+                onRevealHint={mode === 'practice' && isTypedVocabulary ? () => setVocabHintSteps((current) => ({ ...current, [questionKey(question)]: Math.min(vocabHintAnswer.length, vocabHintStep + 1) })) : undefined}
                 onChange={chooseAnswer}
                 onCheck={checkTypedAnswer}
               />
@@ -1170,7 +1180,7 @@ export default function Home() {
       {(mode === 'practice' || mode === 'survival') && hitPulse > 0 && <div key={hitPulse} aria-hidden="true" className="hit-flash pointer-events-none fixed inset-0 z-[65] grid place-items-center bg-rose-700/35"><div className="h-32 w-32 rounded-full border-[14px] border-white/55 shadow-[0_0_80px_32px_rgba(225,29,72,.75)]" /></div>}
       {hintOpen && !gameOver && lockedQuestion === question.id && currentWrongAttempt === 1 && <dialog open className="fixed inset-0 z-[70] m-0 grid h-screen w-screen max-w-none place-items-center bg-slate-950/45 p-4" aria-labelledby="hint-title"><div className="w-full max-w-lg rounded-[28px] border border-amber-200 bg-white p-6 shadow-2xl"><div className="flex items-center gap-3"><img src="duck-learn.png" alt="Mascot vịt đưa gợi ý" className="h-16 w-16 rounded-2xl object-cover"/><div><p className="text-sm font-bold uppercase tracking-wider text-amber-700">Sai lần 1</p><h2 id="hint-title" className="text-xl font-extrabold text-slate-900">Chưa đúng — xem gợi ý nhé</h2></div></div><p className="mt-4 rounded-2xl bg-amber-50 p-4 leading-7 text-slate-700">{question.hint ?? 'Read the instruction carefully. Check the tense marker, word form, sentence structure, or the exact evidence in the passage before trying again.'}</p><p className="mt-3 text-sm text-slate-500">Đáp án chưa được tiết lộ. Câu trả lời sẽ được xóa để em làm lại.</p><Button onClick={retryAfterHint} autoFocus className="mt-5 w-full rounded-xl bg-amber-500 font-bold text-white hover:bg-amber-600">Đã hiểu · Làm lại</Button></div></dialog>}
       {hintOpen && !gameOver && lockedQuestion === question.id && currentWrongAttempt === 2 && <dialog open className="fixed inset-0 z-[75] m-0 h-screen w-screen max-w-none overflow-hidden bg-slate-950" aria-label="T-rex phạt thời gian"><img src="trex-grrr-v2.png" alt="T-rex gầm chiếm toàn màn hình" className="trex-fullscreen absolute inset-0 h-full w-full object-contain"/><div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent px-4 pb-8 pt-28 text-center text-white"><strong className="block text-5xl font-black tracking-[.12em] text-rose-400 drop-shadow-2xl sm:text-7xl">GRRRRRRRR</strong><Button onClick={retryAfterHint} disabled={lockSeconds > 0} className="mt-5 min-w-64 rounded-xl bg-rose-600 py-6 text-lg font-black hover:bg-rose-500 disabled:bg-slate-600">{lockSeconds > 0 ? `🔒 T-rex khóa ${lockSeconds}s` : 'Thoát và làm lại'}</Button></div></dialog>}
-      {hintOpen && !gameOver && lockedQuestion === question.id && currentWrongAttempt >= 3 && <dialog open className="fixed inset-0 z-[75] m-0 grid h-screen w-screen max-w-none place-items-center overflow-hidden bg-gradient-to-b from-amber-950 to-slate-950 p-4" aria-label="Vịt quay Bắc Kinh"><div className="food-penalty text-center"><img src="peking-duck-v1.png" alt="Vịt quay Bắc Kinh" className="mx-auto max-h-[72vh] max-w-[92vw] object-contain drop-shadow-2xl"/><strong className="block text-3xl font-black text-amber-300 sm:text-5xl">VỊT QUAY BẮC KINH</strong><Button onClick={retryAfterHint} disabled={lockSeconds > 0} className="mt-5 min-w-64 rounded-xl bg-amber-500 py-6 text-lg font-black text-slate-950 hover:bg-amber-400 disabled:bg-slate-600 disabled:text-white">{lockSeconds > 0 ? `🔒 Chờ ${lockSeconds}s` : 'Làm lại câu này'}</Button></div></dialog>}
+      {hintOpen && !gameOver && lockedQuestion === question.id && currentWrongAttempt >= 3 && <dialog open className="fixed inset-0 z-[75] m-0 grid h-screen w-screen max-w-none place-items-center overflow-hidden bg-gradient-to-b from-amber-950 to-slate-950 p-4" aria-label={thirdWrongPunishment.label}><div className="food-penalty text-center"><img src={thirdWrongPunishment.asset} alt={thirdWrongPunishment.label} className="mx-auto max-h-[68vh] max-w-[92vw] object-contain drop-shadow-2xl"/><strong className="block text-3xl font-black uppercase text-amber-300 sm:text-5xl">{thirdWrongPunishment.label}</strong><p className="mt-2 font-bold text-white">Sai lần {currentWrongAttempt} · Em có thể làm lại toàn bộ bài.</p><div className="mt-5 flex flex-wrap justify-center gap-3"><Button onClick={retryAfterHint} disabled={lockSeconds > 0} variant="outline" className="min-w-56 rounded-xl border-white/40 bg-white/10 py-6 text-base font-black text-white hover:bg-white/20 disabled:bg-slate-700">{lockSeconds > 0 ? `🔒 Chờ ${lockSeconds}s` : 'Thử lại câu này'}</Button><Button onClick={resetExam} className="min-w-56 rounded-xl bg-amber-500 py-6 text-base font-black text-slate-950 hover:bg-amber-400"><RotateCcw/> Làm lại từ đầu</Button></div></div></dialog>}
       {aidOpen && !gameOver && <dialog open className="fixed inset-0 z-[80] m-0 grid h-screen w-screen max-w-none place-items-center bg-emerald-950/55 p-4" aria-labelledby="aid-title"><div className="w-full max-w-xl rounded-[28px] border-4 border-emerald-400 bg-slate-950 p-6 text-white shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-[.18em] text-emerald-300">Medical crate</p><h2 id="aid-title" className="text-2xl font-black">🧰 Tủ cấp cứu</h2><p className="mt-1 text-sm text-slate-300">Cứ 5 câu đúng sẽ rơi một vật phẩm: từ 5 câu có bông băng; từ 10 câu có thể ra thuốc cấp 2; từ 20 câu có thể ra ống tiêm cấp 3. Chọn một món để hồi máu.</p></div><button onClick={() => setAidOpen(false)} className="rounded-full bg-white/10 p-2 hover:bg-white/20" aria-label="Đóng tủ cấp cứu"><X className="size-5"/></button></div><div className="mt-5 grid gap-3 sm:grid-cols-3">{AID_ITEMS.map((item) => <button key={item.kind} onClick={() => consumeAid(item.kind)} disabled={aidInventory[item.kind] <= 0 || damage <= 0} className={`rounded-2xl border-2 p-4 text-left transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-35 ${item.color}`}><span className="text-4xl">{item.icon}</span><strong className="mt-2 block">{item.name}</strong><span className="text-sm">Hồi {item.heal} máu · Còn {aidInventory[item.kind]}</span></button>)}</div><div className="mt-5 rounded-2xl bg-white/10 p-4"><div className="flex justify-between text-sm"><span>Mức thương tích</span><strong>{damage}/{maxDamage}</strong></div><div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-700"><div className="h-full bg-rose-500" style={{ width: `${damagePercent}%` }}/></div></div></div></dialog>}
       {gameOver && <dialog open className="fixed inset-0 z-[100] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/90 p-4" aria-labelledby="game-over-title"><div className="w-full max-w-md rounded-[28px] border-2 border-rose-500 bg-slate-900 p-6 text-center text-white shadow-2xl"><img src="duck-hospital.png" alt="Vịt băng bó đang hồi phục trong bệnh viện" className="mx-auto h-48 w-48 object-contain drop-shadow-2xl"/><p className="mt-2 text-sm font-bold uppercase tracking-[.22em] text-rose-300">Vịt cần hồi phục</p><h2 id="game-over-title" className="mt-2 text-3xl font-black">Màn hình đã bị che hoàn toàn</h2><p className="mt-3 leading-7 text-slate-300">Số lần sai đã đạt 20% số câu của bài. Vịt đã được băng bó an toàn; em cần làm lại từ đầu và dùng tủ cấp cứu sớm hơn ở lượt tới.</p><Button onClick={resetExam} autoFocus className="mt-5 w-full bg-rose-600 py-6 text-base font-black hover:bg-rose-700"><RotateCcw/> Làm lại từ đầu</Button></div></dialog>}
       {survivalGameOver && <dialog open className="fixed inset-0 z-[110] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/90 p-4" aria-labelledby="survival-over-title"><div className="w-full max-w-lg rounded-[30px] border-2 border-amber-400 bg-slate-900 p-6 text-center text-white shadow-2xl"><div className="grid grid-cols-2 items-end gap-2"><img src="duck-hospital.png" alt="Vịt đang hồi phục" className="h-44 w-full object-contain"/><img src={isBossStage ? 'chicken-boss.png' : 'chicken-army.png'} alt={isBossStage ? 'Gà Boss' : 'Quân đội gà'} className="h-44 w-full object-contain"/></div><p className="mt-2 text-sm font-bold uppercase tracking-[.22em] text-amber-300">Survival kết thúc</p><h2 id="survival-over-title" className="mt-2 text-3xl font-black">{survivalReason === 'time' ? 'Hết thời gian!' : 'Vịt đã hết máu!'}</h2><p className="mt-3 leading-7 text-slate-300">Bạn đã tới màn {survivalStage + 1} · {stageName}, đạt chuỗi cao nhất {bestStreak}. Bắt đầu lại với 02:00 và 5 máu nhé.</p><Button onClick={resetExam} autoFocus className="mt-5 w-full bg-amber-500 py-6 text-base font-black text-slate-950 hover:bg-amber-400"><RotateCcw/> Chơi Survival lại</Button></div></dialog>}
