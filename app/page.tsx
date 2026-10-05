@@ -40,7 +40,7 @@ type HubPanel = 'map' | 'vault' | 'wrong' | 'missions' | 'shop' | 'inventory' | 
 type FlagEntry = { key: string; grade: GradeLevel; examId: number; examTitle: string; prompt: string; section: Question['section']; savedAt: number };
 type WrongEntry = FlagEntry & { mistakes: number };
 type DailyStats = { date: string; correct: number; flags: number; completed: number };
-type BossPenaltyKind = 'keyboard' | 'one-hp' | 'screen-lock' | 'duck-salad' | 'duck-porridge' | 'plucked-duck' | 'peking-duck' | 'duck-bamboo';
+type BossPenaltyKind = 'keyboard' | 'extra-options' | 'one-hp' | 'screen-lock' | 'duck-salad' | 'duck-porridge' | 'plucked-duck' | 'peking-duck' | 'duck-bamboo';
 type BossPenalty = { kind: BossPenaltyKind; seconds: number; label: string; asset?: string };
 type LoadoutSlot = 'head' | 'outfit' | 'weapon';
 type Loadout = Record<LoadoutSlot, string | null>;
@@ -195,7 +195,7 @@ function capMultipleChoiceOptions(question: Question): Question {
   return { ...question, options, answer };
 }
 
-function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, targetCount: number, seenBefore: Set<string>, pinnedKey?: string | null, excludeTypedVocabulary = false, selectionOnly = false, reviewedVocabularyExamIds: Set<number> = new Set()) {
+function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, targetCount: number, seenBefore: Set<string>, pinnedKey?: string | null, excludeTypedVocabulary = false, selectionOnly = false, reviewedVocabularyExamIds: Set<number> = new Set(), excludeLookingBack = false) {
   const sourcePool = allExams.flatMap((source, sourceIndex) => source.questions.map((question) => ({
     ...question,
     passage: question.section === 'Reading' ? source.passage : undefined,
@@ -203,6 +203,7 @@ function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, ta
     sourceIndex,
   }))).filter((question) => !(excludeTypedVocabulary && isTypedVocabularyQuestion(question)))
     .filter((question) => !(selectionOnly && (question.kind === 'typed' || question.kind === 'cloze-dropdown' || question.options.length < 2)))
+    .filter((question) => !(excludeLookingBack && question.skillArea === 'Looking Back'))
     .filter((question) => !(isLookingBackVocabularyQuestion(question) && !reviewedVocabularyExamIds.has(allExams[question.sourceIndex].id)));
   const unique = new Map<string, Question & { sourceIndex: number }>();
   for (const item of sourcePool) if (!unique.has(questionKey(item))) unique.set(questionKey(item), item);
@@ -355,10 +356,12 @@ export default function Home() {
       : grade === 8 ? grammarLessons8[selectedUnit] : grade === 9 ? grammarLessons9[selectedUnit] : grammarLessons10[selectedUnit]
     : undefined;
   const reviewedVocabularyExamIds = useMemo(() => new Set(availableExams.filter((item) => reviewedVocabularyKeys.includes(`${grade}-${item.id}`)).map((item) => item.id)), [availableExams, grade, reviewedVocabularyKeys]);
-  const questions = useMemo(() => buildMixedQuestions(exam, availableExams, examIndex, mode === 'practice' ? exam.questions.length : 40, seenAtSelection, focusQuestionKey, mode === 'test', mode === 'survival', reviewedVocabularyExamIds), [availableExams, exam, examIndex, focusQuestionKey, mode, reviewedVocabularyExamIds, seenAtSelection]);
+  const questions = useMemo(() => buildMixedQuestions(exam, availableExams, examIndex, mode === 'practice' ? exam.questions.length : 40, seenAtSelection, focusQuestionKey, mode === 'test', mode === 'survival', reviewedVocabularyExamIds, mode === 'test'), [availableExams, exam, examIndex, focusQuestionKey, mode, reviewedVocabularyExamIds, seenAtSelection]);
   const question = questions[questionIndex];
   const selected = drafts[question.id] ?? answers[question.id];
-  const displayQuestion = question;
+  const displayQuestion = useMemo<Question>(() => bossPenalty?.kind === 'extra-options' && mode === 'survival' && survivalStage % 7 === 6 && question.kind !== 'typed' && question.kind !== 'cloze-dropdown' && question.options.length === 4
+    ? { ...question, options: [...question.options, 'Both A and B', 'Not enough information'] }
+    : question, [bossPenalty?.kind, mode, question, survivalStage]);
 
   const score = useMemo(() => questions.filter((item) => isQuestionCorrect(item, answers[item.id])).length, [answers, questions]);
   const answeredCount = questions.filter((item) => isAnswerComplete(item, answers[item.id])).length;
@@ -725,7 +728,7 @@ export default function Home() {
   }, [advanceSurvivalQuestion, defeatChickens, recordCorrect, weapon]);
 
   const triggerBossPenalty = useCallback(() => {
-    const kinds: BossPenaltyKind[] = ['keyboard', 'one-hp', 'screen-lock', 'duck-salad', 'duck-porridge', 'plucked-duck', 'peking-duck', 'duck-bamboo'];
+    const kinds: BossPenaltyKind[] = ['keyboard', 'extra-options', 'one-hp', 'screen-lock', 'duck-salad', 'duck-porridge', 'plucked-duck', 'peking-duck', 'duck-bamboo'];
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     if (kind === 'one-hp') {
       setBossPenalty({ kind, seconds: 3, label: 'Boss ép máu còn 1!' });
@@ -733,6 +736,10 @@ export default function Home() {
     }
     if (kind === 'keyboard') {
       setBossPenalty({ kind, seconds: 6, label: 'Khóa bàn phím!' });
+      return kind;
+    }
+    if (kind === 'extra-options') {
+      setBossPenalty({ kind, seconds: 15, label: 'Boss tung thêm 2 đáp án nhiễu!' });
       return kind;
     }
     if (kind === 'screen-lock') {
