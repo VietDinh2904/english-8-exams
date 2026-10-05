@@ -19,16 +19,76 @@ import { enrichUnitExam } from '@/lib/unit-enrichment';
 import { ExerciseQuestion } from '@/components/exercise-question';
 import { correctAnswer, formatAnswer, isAnswerComplete, isQuestionCorrect, questionKey, type AnswerValue } from '@/lib/question-utils';
 import { semester2Exams, upgradeEnglish10MidtermSix } from '@/lib/semester2-exams';
+import { newBookUnitExams } from '@/lib/unit-new-books';
+import { extendedExams, extendedGrammarLessons, extendedVocabulary, type ExtendedGrade } from '@/lib/extended-grades';
 
 type Answers = Record<number, AnswerValue>;
-type ExamMode = 'practice' | 'test';
-type GradeLevel = 8 | 9 | 10;
+type ExamMode = 'practice' | 'test' | 'survival';
+type CoreGrade = 8 | 9 | 10;
+type GradeLevel = ExtendedGrade | CoreGrade;
 type MenuGroup = NonNullable<Exam['menuGroup']>;
 type ModelContext = { registerTool: (tool: Record<string, unknown>, options?: { signal: AbortSignal }) => void | Promise<void> };
 type DictionaryState = { word: string; translation: string; status: 'loading' | 'ready' | 'error' | 'empty'; x: number; y: number };
-const exams8 = distributeExams([...baseExams8, ...additionalExams8, ...semester2Exams[8]].map((exam) => enrichUnitExam(exam, 8)));
-const balancedExams9 = distributeExams([...exams9, ...semester2Exams[9]].map((exam) => enrichUnitExam(exam, 9)));
-const balancedExams10 = distributeExams(upgradeEnglish10MidtermSix([...exams10, ...semester2Exams[10]]).map((exam) => enrichUnitExam(exam, 10)));
+type AidKind = 'cotton' | 'medicine' | 'injection';
+type AidInventory = Record<AidKind, number>;
+type ChickenSpawn = { id: number; x: number; y: number; size: number; rotate: number; delay: number };
+
+const STARTER_AID: AidInventory = { cotton: 2, medicine: 1, injection: 1 };
+const AID_ITEMS: { kind: AidKind; name: string; icon: string; heal: number; color: string }[] = [
+  { kind: 'cotton', name: 'Bông băng', icon: '🩹', heal: 1, color: 'border-sky-200 bg-sky-50 text-sky-900' },
+  { kind: 'medicine', name: 'Thuốc hồi phục', icon: '💊', heal: 2, color: 'border-emerald-200 bg-emerald-50 text-emerald-900' },
+  { kind: 'injection', name: 'Ống tiêm', icon: '💉', heal: 3, color: 'border-violet-200 bg-violet-50 text-violet-900' },
+];
+const COMMANDO_RANKS = [
+  { streak: 10, name: 'Vịt Xạ Thủ' },
+  { streak: 20, name: 'Vịt Liên Thanh' },
+  { streak: 30, name: 'Vịt Đặc Nhiệm' },
+  { streak: 40, name: 'Vịt Hỏa Lực' },
+  { streak: Number.POSITIVE_INFINITY, name: 'Vịt Commando' },
+];
+const SURVIVAL_STAGES = ['Đi bộ', 'Xe đạp', 'Xe máy', 'Xe Jeep', 'Xe tăng', 'Máy bay chiến đấu'] as const;
+const SURVIVAL_TARGET = 10;
+
+function unitNumber(exam: Exam, grade: GradeLevel) {
+  if (exam.unit) return exam.unit;
+  if (exam.menuGroup !== 'unit') return undefined;
+  return grade === 8 ? exam.id - 6 : grade === 9 ? exam.id - 100 : exam.id;
+}
+
+function prepareExams(items: Exam[], grade: CoreGrade) {
+  const enriched = items.map((exam) => enrichUnitExam(exam, grade));
+  const newByUnit = new Map(newBookUnitExams[grade].map((exam) => [exam.unit, exam]));
+  const inserted = new Set<number>();
+  const prepared: Exam[] = [];
+  for (const exam of enriched) {
+    const unit = unitNumber(exam, grade);
+    const newBook = unit ? newByUnit.get(unit) : undefined;
+    if (!unit || !newBook) {
+      prepared.push(exam);
+      continue;
+    }
+    const baseLabel = (exam.menuLabel ?? `Unit ${unit}`).replace(/ · Bộ cũ$/, '');
+    prepared.push({ ...exam, unit, bookLabel: 'Bộ cũ', menuLabel: `${baseLabel} · Bộ cũ` }, newBook);
+    inserted.add(unit);
+  }
+  for (const exam of newBookUnitExams[grade]) {
+    if (exam.unit && !inserted.has(exam.unit)) prepared.push(exam);
+  }
+  return prepared;
+}
+
+const exams8 = distributeExams(prepareExams([...baseExams8, ...additionalExams8, ...semester2Exams[8]], 8));
+const balancedExams9 = distributeExams(prepareExams([...exams9, ...semester2Exams[9]], 9));
+const balancedExams10 = distributeExams(prepareExams(upgradeEnglish10MidtermSix([...exams10, ...semester2Exams[10]]), 10));
+const examsByGrade: Record<GradeLevel, Exam[]> = {
+  6: extendedExams[6],
+  7: extendedExams[7],
+  8: exams8,
+  9: balancedExams9,
+  10: balancedExams10,
+  11: extendedExams[11],
+  12: extendedExams[12],
+};
 
 function buildTestQuestions(examQuestions: Question[], allExams: Exam[], examIndex: number) {
   const chosen: Question[] = [];
@@ -51,7 +111,8 @@ function buildTestQuestions(examQuestions: Question[], allExams: Exam[], examInd
 }
 
 function randomVocabulary(grade: GradeLevel): VocabularyItem[] {
-  return [...vocabularyByGrade[grade]].sort(() => Math.random() - 0.5).slice(0, 3);
+  const pool = grade === 6 || grade === 7 || grade === 11 || grade === 12 ? extendedVocabulary[grade] : vocabularyByGrade[grade];
+  return [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
 }
 
 function formatTime(seconds: number) {
@@ -74,24 +135,71 @@ export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const [vocabulary, setVocabulary] = useState<VocabularyItem[]>([]);
   const [dictionary, setDictionary] = useState<DictionaryState | null>(null);
-  const availableExams = grade === 8 ? exams8 : grade === 9 ? balancedExams9 : balancedExams10;
+  const [wrongAttempts, setWrongAttempts] = useState<Record<number, number>>({});
+  const [damage, setDamage] = useState(0);
+  const [correctStreak, setCorrectStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [lockSeconds, setLockSeconds] = useState(0);
+  const [aidInventory, setAidInventory] = useState<AidInventory>(STARTER_AID);
+  const [aidOpen, setAidOpen] = useState(false);
+  const [hitPulse, setHitPulse] = useState(0);
+  const [survivalStage, setSurvivalStage] = useState(0);
+  const [stageCorrect, setStageCorrect] = useState(0);
+  const [survivalLives, setSurvivalLives] = useState(5);
+  const [chickenSpawns, setChickenSpawns] = useState<ChickenSpawn[]>([]);
+  const [survivalEnded, setSurvivalEnded] = useState(false);
+  const [survivalReason, setSurvivalReason] = useState<'time' | 'lives'>('lives');
+  const [stageUpNotice, setStageUpNotice] = useState<string | null>(null);
+  const availableExams = examsByGrade[grade];
   const exam = availableExams[examIndex];
-  const unitLesson = exam.menuGroup === 'unit'
-    ? grade === 8 ? grammarLessons8[exam.id - 6] : grade === 9 ? grammarLessons9[exam.id - 100] : grammarLessons10[exam.id]
+  const selectedUnit = unitNumber(exam, grade);
+  const unitLesson = exam.menuGroup === 'unit' && selectedUnit
+    ? grade === 6 || grade === 7 || grade === 11 || grade === 12
+      ? extendedGrammarLessons[grade][selectedUnit]
+      : grade === 8 ? grammarLessons8[selectedUnit] : grade === 9 ? grammarLessons9[selectedUnit] : grammarLessons10[selectedUnit]
     : undefined;
-  const questions = useMemo(() => mode === 'test' ? buildTestQuestions(exam.questions, availableExams, examIndex) : exam.questions, [availableExams, exam, examIndex, mode]);
+  const questions = useMemo(() => mode === 'test' || mode === 'survival' ? buildTestQuestions(exam.questions, availableExams, examIndex) : exam.questions, [availableExams, exam, examIndex, mode]);
   const question = questions[questionIndex];
   const selected = drafts[question.id] ?? answers[question.id];
 
   const score = useMemo(() => questions.filter((item) => isQuestionCorrect(item, answers[item.id])).length, [answers, questions]);
   const answeredCount = questions.filter((item) => isAnswerComplete(item, answers[item.id])).length;
   const canSubmit = answeredCount === questions.length;
+  const maxDamage = Math.max(1, Math.ceil(questions.length * 0.2));
+  const damagePercent = Math.min(100, Math.round((damage / maxDamage) * 100));
+  const gameOver = mode === 'practice' && damage >= maxDamage;
+  const commandoUnlocked = mode === 'practice' && canSubmit && score === questions.length;
+  const rankIndex = commandoUnlocked ? 4 : correctStreak >= 40 ? 3 : correctStreak >= 30 ? 2 : correctStreak >= 20 ? 1 : correctStreak >= 10 ? 0 : -1;
+  const rankName = commandoUnlocked ? 'Vịt Commando' : rankIndex >= 0 ? COMMANDO_RANKS[rankIndex].name : 'Vịt Tân Binh';
+  const isBossStage = mode === 'survival' && survivalStage % 7 === 6;
+  const vehicleIndex = Math.min(survivalStage % 7, SURVIVAL_STAGES.length - 1);
+  const stageName = isBossStage ? 'Màn Boss Gà Khổng Lồ' : SURVIVAL_STAGES[vehicleIndex];
+  const survivalGameOver = mode === 'survival' && survivalEnded;
 
   useEffect(() => {
-    if (mode !== 'test' || submitted || secondsLeft <= 0) return;
+    if ((mode !== 'test' && mode !== 'survival') || submitted || survivalEnded || secondsLeft <= 0) return;
     const timer = window.setInterval(() => setSecondsLeft((value) => Math.max(0, value - 1)), 1000);
     return () => window.clearInterval(timer);
-  }, [mode, secondsLeft, submitted]);
+  }, [mode, secondsLeft, submitted, survivalEnded]);
+
+  useEffect(() => {
+    if (mode === 'survival' && secondsLeft === 0 && !survivalEnded) {
+      setSurvivalReason('time');
+      setSurvivalEnded(true);
+    }
+  }, [mode, secondsLeft, survivalEnded]);
+
+  useEffect(() => {
+    if (!stageUpNotice) return;
+    const timer = window.setTimeout(() => setStageUpNotice(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [stageUpNotice]);
+
+  useEffect(() => {
+    if (lockSeconds <= 0) return;
+    const timer = window.setInterval(() => setLockSeconds((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [lockSeconds]);
 
   useEffect(() => {
     setVocabulary(randomVocabulary(grade));
@@ -106,9 +214,23 @@ export default function Home() {
     setHintOpen(false);
     setFlagged([]);
     setSubmitted(false);
-    setSecondsLeft(60 * 60);
+    setSecondsLeft(mode === 'survival' ? 2 * 60 : 60 * 60);
     setDictionary(null);
-  }, []);
+    setWrongAttempts({});
+    setDamage(0);
+    setCorrectStreak(0);
+    setBestStreak(0);
+    setLockSeconds(0);
+    setAidInventory(STARTER_AID);
+    setAidOpen(false);
+    setHitPulse(0);
+    setSurvivalStage(0);
+    setStageCorrect(0);
+    setSurvivalLives(5);
+    setChickenSpawns([]);
+    setSurvivalEnded(false);
+    setStageUpNotice(null);
+  }, [mode]);
 
   const switchGrade = (nextGrade: GradeLevel) => {
     setGrade(nextGrade);
@@ -120,8 +242,22 @@ export default function Home() {
     setHintOpen(false);
     setFlagged([]);
     setSubmitted(false);
-    setSecondsLeft(60 * 60);
+    setSecondsLeft(mode === 'survival' ? 2 * 60 : 60 * 60);
     setDictionary(null);
+    setWrongAttempts({});
+    setDamage(0);
+    setCorrectStreak(0);
+    setBestStreak(0);
+    setLockSeconds(0);
+    setAidInventory(STARTER_AID);
+    setAidOpen(false);
+    setHitPulse(0);
+    setSurvivalStage(0);
+    setStageCorrect(0);
+    setSurvivalLives(5);
+    setChickenSpawns([]);
+    setSurvivalEnded(false);
+    setStageUpNotice(null);
   };
 
   const switchMode = (nextMode: ExamMode) => {
@@ -133,45 +269,167 @@ export default function Home() {
     setHintOpen(false);
     setFlagged([]);
     setSubmitted(false);
-    setSecondsLeft(60 * 60);
+    setSecondsLeft(nextMode === 'survival' ? 2 * 60 : 60 * 60);
     setDictionary(null);
+    setWrongAttempts({});
+    setDamage(0);
+    setCorrectStreak(0);
+    setBestStreak(0);
+    setLockSeconds(0);
+    setAidInventory(STARTER_AID);
+    setAidOpen(false);
+    setHitPulse(0);
+    setSurvivalStage(0);
+    setStageCorrect(0);
+    setSurvivalLives(5);
+    setChickenSpawns([]);
+    setSurvivalEnded(false);
+    setStageUpNotice(null);
   };
+
+  const recordCorrect = useCallback(() => {
+    setCorrectStreak((current) => {
+      const next = current + 1;
+      setBestStreak((best) => Math.max(best, next));
+      return next;
+    });
+  }, []);
+
+  const recordWrong = useCallback((questionId: number) => {
+    const attempt = (wrongAttempts[questionId] ?? 0) + 1;
+    setWrongAttempts((current) => ({ ...current, [questionId]: attempt }));
+    setDamage((current) => current + 1);
+    setHitPulse((current) => current + 1);
+    if (typeof document !== 'undefined' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.animate([
+        { transform: 'translate3d(0,0,0)' },
+        { transform: 'translate3d(-9px,4px,0)' },
+        { transform: 'translate3d(8px,-5px,0)' },
+        { transform: 'translate3d(-5px,3px,0)' },
+        { transform: 'translate3d(0,0,0)' },
+      ], { duration: 420, easing: 'cubic-bezier(.36,.07,.19,.97)' });
+    }
+    setCorrectStreak(0);
+    setLockedQuestion(questionId);
+    setLockSeconds(attempt === 1 ? 0 : attempt === 2 ? 10 : 20);
+    setHintOpen(true);
+  }, [wrongAttempts]);
+
+  const advanceSurvivalQuestion = useCallback(() => {
+    setQuestionIndex((current) => (current + 1) % questions.length);
+  }, [questions.length]);
+
+  const recordSurvivalCorrect = useCallback(() => {
+    recordCorrect();
+    setStageCorrect((current) => {
+      const next = current + 1;
+      if (next < SURVIVAL_TARGET) return next;
+      setSurvivalStage((stage) => {
+        const upgraded = stage + 1;
+        setSurvivalLives(upgraded % 7 === 6 ? 3 : 5);
+        setStageUpNotice(upgraded % 7 === 6 ? 'Boss Gà Khổng Lồ · Chỉ có 3 máu!' : `${SURVIVAL_STAGES[Math.min(upgraded % 7, SURVIVAL_STAGES.length - 1)]} · +01:00`);
+        return upgraded;
+      });
+      setSecondsLeft((time) => time + 60);
+      setChickenSpawns([]);
+      setAnswers({});
+      setDrafts({});
+      return 0;
+    });
+    advanceSurvivalQuestion();
+  }, [advanceSurvivalQuestion, recordCorrect]);
+
+  const recordSurvivalWrong = useCallback(() => {
+    setCorrectStreak(0);
+    setHitPulse((current) => current + 1);
+    if (typeof document !== 'undefined' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.animate([
+        { transform: 'translate3d(0,0,0)' },
+        { transform: 'translate3d(-11px,5px,0)' },
+        { transform: 'translate3d(10px,-6px,0)' },
+        { transform: 'translate3d(-6px,3px,0)' },
+        { transform: 'translate3d(0,0,0)' },
+      ], { duration: 430, easing: 'cubic-bezier(.36,.07,.19,.97)' });
+    }
+    setChickenSpawns((current) => {
+      const amount = isBossStage ? 3 : 5;
+      const created = Array.from({ length: amount }, (_, index) => ({
+        id: Date.now() + index,
+        x: 4 + Math.random() * 86,
+        y: 8 + Math.random() * 76,
+        size: 64 + Math.random() * 70,
+        rotate: -22 + Math.random() * 44,
+        delay: Math.random() * 0.35,
+      }));
+      return [...current, ...created].slice(-32);
+    });
+    setSurvivalLives((lives) => {
+      const next = lives - 1;
+      if (next <= 0) {
+        setSurvivalReason('lives');
+        setSurvivalEnded(true);
+      }
+      return Math.max(0, next);
+    });
+    setDrafts({});
+    advanceSurvivalQuestion();
+  }, [advanceSurvivalQuestion, isBossStage]);
 
   const chooseAnswer = useCallback((value: AnswerValue) => {
     const currentQuestion = questions[questionIndex];
-    if (lockedQuestion === currentQuestion.id || (mode === 'practice' && answers[currentQuestion.id] !== undefined)) return;
+    if (gameOver || survivalGameOver || lockedQuestion === currentQuestion.id || (mode === 'practice' && answers[currentQuestion.id] !== undefined)) return;
     if (mode === 'test') {
       setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
       setDrafts((current) => ({ ...current, [currentQuestion.id]: value }));
+      return;
+    }
+    if (mode === 'survival') {
+      setDrafts((current) => ({ ...current, [currentQuestion.id]: value }));
+      if (typeof value !== 'number') return;
+      if (isQuestionCorrect(currentQuestion, value)) recordSurvivalCorrect();
+      else recordSurvivalWrong();
       return;
     }
     setDrafts((current) => ({ ...current, [currentQuestion.id]: value }));
     if (typeof value !== 'number') return;
     if (isQuestionCorrect(currentQuestion, value)) {
       setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
+      recordCorrect();
     } else {
-      setLockedQuestion(currentQuestion.id);
-      setHintOpen(true);
+      recordWrong(currentQuestion.id);
     }
-  }, [answers, lockedQuestion, mode, questionIndex, questions]);
+  }, [answers, gameOver, lockedQuestion, mode, questionIndex, questions, recordCorrect, recordSurvivalCorrect, recordSurvivalWrong, recordWrong, survivalGameOver]);
 
   const checkTypedAnswer = useCallback(() => {
     const currentQuestion = questions[questionIndex];
     const value = drafts[currentQuestion.id];
-    if (!isAnswerComplete(currentQuestion, value)) return;
+    if (gameOver || survivalGameOver || !isAnswerComplete(currentQuestion, value)) return;
+    if (mode === 'survival') {
+      if (isQuestionCorrect(currentQuestion, value)) recordSurvivalCorrect();
+      else recordSurvivalWrong();
+      return;
+    }
     if (mode === 'test' || isQuestionCorrect(currentQuestion, value)) {
       setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
+      if (mode === 'practice') recordCorrect();
     } else {
-      setLockedQuestion(currentQuestion.id);
-      setHintOpen(true);
+      recordWrong(currentQuestion.id);
     }
-  }, [drafts, mode, questionIndex, questions]);
+  }, [drafts, gameOver, mode, questionIndex, questions, recordCorrect, recordSurvivalCorrect, recordSurvivalWrong, recordWrong, survivalGameOver]);
 
   const retryAfterHint = () => {
-    if (lockedQuestion === null) return;
+    if (lockedQuestion === null || lockSeconds > 0) return;
     setDrafts((current) => { const next = { ...current }; delete next[lockedQuestion]; return next; });
     setLockedQuestion(null);
     setHintOpen(false);
+  };
+
+  const useAid = (kind: AidKind) => {
+    const item = AID_ITEMS.find((entry) => entry.kind === kind);
+    if (!item || aidInventory[kind] <= 0 || damage <= 0 || gameOver) return;
+    setAidInventory((current) => ({ ...current, [kind]: current[kind] - 1 }));
+    setDamage((current) => Math.max(0, current - item.heal));
+    setAidOpen(false);
   };
 
   const openDictionary = async (event: ReactMouseEvent<HTMLElement>) => {
@@ -242,6 +500,7 @@ export default function Home() {
   const renderExamButton = (item: (typeof availableExams)[number], index: number) => (
     <button key={item.id} onClick={() => selectExam(index)} className={`group rounded-2xl px-3 py-2.5 text-left transition ${index === examIndex ? 'bg-sky-600 text-white shadow-md shadow-sky-100' : 'bg-sky-50 text-[#15324a] hover:bg-sky-100'}`}>
       <span className="block font-bold">{item.menuLabel ?? `Đề số ${item.id}`}</span>
+      {item.bookLabel && <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${index === examIndex ? 'bg-white/20 text-white' : item.bookLabel === 'Bộ mới' ? 'bg-amber-100 text-amber-800' : 'bg-white text-slate-500'}`}>{item.bookLabel}</span>}
     </button>
   );
 
@@ -291,8 +550,8 @@ export default function Home() {
             <img src={grade === 8 ? 'duck-grade8-reading.png' : grade === 9 ? 'duck-grade9-explorer.png' : 'duck-learn.png'} alt={`Mascot vịt vàng English ${grade}`} className="h-12 w-12 rounded-xl object-cover object-top" />
             <div><strong className="block text-lg leading-tight">English MOET</strong><span className="hidden text-sm text-slate-500 sm:block">English {grade} · Học chắc, luyện đúng dạng</span></div>
           </div>
-          <div className="flex rounded-2xl border border-sky-100 bg-sky-50 p-1" aria-label="Chọn khối lớp">
-            {([8, 9, 10] as GradeLevel[]).map((item) => <button key={item} onClick={() => switchGrade(item)} className={`rounded-xl px-2.5 py-2 text-sm font-extrabold transition sm:px-4 ${grade === item ? 'bg-sky-600 text-white shadow-sm' : 'text-sky-800 hover:bg-white'}`} aria-pressed={grade === item}>English {item}</button>)}
+          <div className="flex max-w-[58vw] overflow-x-auto rounded-2xl border border-sky-100 bg-sky-50 p-1 sm:max-w-[68vw]" aria-label="Chọn khối lớp">
+            {([6, 7, 8, 9, 10, 11, 12] as GradeLevel[]).map((item) => <button key={item} onClick={() => switchGrade(item)} className={`shrink-0 rounded-xl px-2 py-2 text-xs font-extrabold transition sm:px-3 sm:text-sm ${grade === item ? 'bg-sky-600 text-white shadow-sm' : 'text-sky-800 hover:bg-white'}`} aria-pressed={grade === item}>English {item}</button>)}
           </div>
           <span className="hidden rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800 xl:inline">{availableExams.length} mục học · {availableExams.reduce((total, item) => total + item.questions.length, 0)} câu</span>
           <Sheet><SheetTrigger render={<Button variant="outline" size="icon" className="lg:hidden" aria-label="Mở danh sách đề" />}><Menu /></SheetTrigger><SheetContent side="left"><SheetTitle className="mb-5">Chọn đề</SheetTitle>{examMenu}</SheetContent></Sheet>
@@ -307,13 +566,15 @@ export default function Home() {
             <div><p className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-sky-700"><BookOpen className="size-4"/> English {grade} · {question.section}</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{exam.title}</h1></div>
             <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">Câu {questionIndex + 1} / {questions.length}</span>
           </div>
-          <div className="mb-3 grid gap-2 text-sm sm:grid-cols-2">
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-950"><strong>Luyện tập:</strong> mỗi lần một câu, không giới hạn thời gian. Nếu sai, câu bị khóa và hiện gợi ý; bấm “Đã hiểu” để xóa câu trả lời và làm lại từ đầu. Bôi đen tiếng Anh rồi nhấp chuột phải để dịch.</div>
+          <div className="mb-3 grid gap-2 text-sm sm:grid-cols-3">
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-950"><strong>Luyện tập:</strong> sai lần 1 xem gợi ý; lần 2 khóa 10 giây; từ lần 3 khóa 20 giây. Mỗi lần sai mất một máu và chỉ tủ cấp cứu mới xóa được vết thương. Bôi đen tiếng Anh rồi nhấp chuột phải để dịch.</div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700"><strong>Làm bài test:</strong> mỗi lần một câu; 40 câu trong 60 phút. Làm đủ và nộp bài mới xem đáp án, lời giải.</div>
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950"><strong>Survival:</strong> có 2 phút và 5 máu. Đúng 10 câu để qua màn, nâng phương tiện và cộng thêm 1 phút. Màn Boss chỉ có 3 máu.</div>
           </div>
-          <div className="mb-5 grid grid-cols-2 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-sm">
+          <div className="mb-5 grid grid-cols-3 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-sm">
             <button onClick={() => switchMode('practice')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'practice' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Luyện tập</button>
             <button onClick={() => switchMode('test')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'test' ? 'bg-[#123c5a] text-white shadow-sm' : 'text-slate-600 hover:bg-sky-50'}`}>Làm bài test</button>
+            <button onClick={() => switchMode('survival')} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === 'survival' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-600 hover:bg-amber-50'}`}>Survival</button>
           </div>
           {exam.sourceNote && <p className="mb-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900"><strong>Nguồn ôn tập:</strong> {exam.sourceNote}</p>}
           {unitLesson && (mode === 'practice' || submitted) && <GrammarLesson key={`${grade}-${exam.id}`} grade={grade} lesson={unitLesson} />}
@@ -331,7 +592,7 @@ export default function Home() {
 
           {submitted ? (
             <article className="overflow-hidden rounded-[28px] border border-sky-100 bg-white text-center shadow-[0_16px_50px_rgba(24,95,140,.08)]">
-              <div className="bg-sky-600 px-6 py-8 text-white"><img src="duck-celebrate.png" alt="Vịt nhỏ chúc mừng" className="mx-auto h-36 w-36 object-contain drop-shadow-lg"/><p className="mt-2 text-sm font-bold uppercase tracking-[.18em] text-sky-100">Đã hoàn thành English {grade} · {exam.menuLabel ?? `Đề ${exam.id}`}</p><h2 className="mt-2 text-4xl font-extrabold">{score}/{questions.length} câu đúng</h2></div>
+              <div className="bg-sky-600 px-6 py-8 text-white">{commandoUnlocked ? <><div aria-label="Huy hiệu Vịt Commando" className="mx-auto h-44 w-28 bg-no-repeat drop-shadow-xl" style={{ backgroundImage: 'url(duck-commando-ranks.png)', backgroundSize: '500% 100%', backgroundPosition: '100% center' }} /><span className="mt-2 inline-flex rounded-full bg-amber-300 px-4 py-1.5 text-sm font-black uppercase tracking-wider text-amber-950">Huy hiệu Vịt Commando</span></> : <img src="duck-celebrate.png" alt="Vịt nhỏ chúc mừng" className="mx-auto h-36 w-36 object-contain drop-shadow-lg"/>}<p className="mt-3 text-sm font-bold uppercase tracking-[.18em] text-sky-100">Đã hoàn thành English {grade} · {exam.menuLabel ?? `Đề ${exam.id}`}</p><h2 className="mt-2 text-4xl font-extrabold">{score}/{questions.length} câu đúng</h2></div>
               <div className="p-7">
                 <p className="text-lg text-slate-600">{score / questions.length >= 0.8 ? 'Xuất sắc! Vịt Nhỏ thấy bạn đã nắm bài rất chắc.' : score / questions.length >= 0.6 ? 'Làm tốt lắm! Xem lại vài câu sai là bạn sẽ tiến bộ nhanh.' : 'Mình cùng xem lại đáp án rồi thử lần nữa nhé.'}</p>
                 <div className="mt-7 space-y-3 text-left">
@@ -354,7 +615,7 @@ export default function Home() {
             </article>
           ) : (
             <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_16px_50px_rgba(24,95,140,.08)] sm:p-8">
-              <div className="mb-5 flex items-center justify-between gap-3"><span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">{question.section === 'Reading' ? `Bài đọc · ${exam.passageTitle}` : 'Ngữ âm · Từ vựng · Ngữ pháp'}</span><button onClick={toggleFlag} className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${flagged.includes(question.id) ? 'bg-amber-100 text-amber-800' : 'text-slate-500 hover:bg-slate-50'}`}><Flag className="size-4" fill={flagged.includes(question.id) ? 'currentColor' : 'none'}/> {flagged.includes(question.id) ? 'Đã đánh dấu' : 'Đánh dấu'}</button></div>
+              <div className="mb-5 flex items-center justify-between gap-3"><span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">{question.skillArea ?? (question.section === 'Reading' ? `Bài đọc · ${exam.passageTitle}` : question.section === 'Writing' ? 'Writing' : 'Ngữ âm · Từ vựng · Ngữ pháp')}</span><button onClick={toggleFlag} className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${flagged.includes(question.id) ? 'bg-amber-100 text-amber-800' : 'text-slate-500 hover:bg-slate-50'}`}><Flag className="size-4" fill={flagged.includes(question.id) ? 'currentColor' : 'none'}/> {flagged.includes(question.id) ? 'Đã đánh dấu' : 'Đánh dấu'}</button></div>
               {question.section === 'Reading' && exam.passage && <div className="mb-6 max-h-52 overflow-y-auto rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-[15px] leading-7 text-slate-700"><strong className="mb-2 block text-amber-900">{exam.passageTitle}</strong>{exam.passage}</div>}
               <ExerciseQuestion
                 question={question}
@@ -362,23 +623,54 @@ export default function Home() {
                 value={selected}
                 disabled={lockedQuestion === question.id || (mode === 'practice' && answers[question.id] !== undefined)}
                 practiceCorrect={mode === 'practice' && isQuestionCorrect(question, answers[question.id])}
-                showCheck={mode === 'practice'}
+                showCheck={mode === 'practice' || mode === 'survival'}
                 onChange={chooseAnswer}
                 onCheck={checkTypedAnswer}
               />
               {mode === 'practice' && answers[question.id] !== undefined && <div aria-live="polite" className="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-900"><div className="bg-emerald-100 px-4 py-2 text-sm font-bold uppercase tracking-wide">Hướng dẫn giải chi tiết</div><div className="p-4"><strong>Chính xác! Đáp án: {correctAnswer(question)}</strong><p className="mt-2 text-[15px] leading-7">{question.explanation}</p></div></div>}
-              <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questionIndex === questions.length - 1 ? <Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">{mode === 'test' ? 'Nộp bài' : 'Xem tổng kết'}</Button> : <Button onClick={() => setQuestionIndex((value) => value + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button>}</div>
+              {mode !== 'survival' ? <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questionIndex === questions.length - 1 ? <Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">{mode === 'test' ? 'Nộp bài' : 'Xem tổng kết'}</Button> : <Button onClick={() => setQuestionIndex((value) => value + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button>}</div> : <p className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-center text-sm font-bold text-amber-900">Chọn hoặc nhập đáp án — Survival sẽ tự chuyển sang câu kế tiếp.</p>}
             </article>
           )}
         </section>
 
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-          {mode === 'test' ? <div className="rounded-3xl bg-[#123c5a] p-5 text-white shadow-lg shadow-sky-100"><div className="mb-3 flex items-center justify-between"><span className="text-sm text-sky-100">Thời gian còn lại</span><Clock3 className="size-5 text-amber-300"/></div><strong suppressHydrationWarning className="font-mono text-3xl tracking-tight">{formatTime(secondsLeft)}</strong><div className="mt-4 flex justify-between border-t border-white/15 pt-3 text-sm"><span>Đã làm</span><b>{answeredCount}/{questions.length}</b></div><Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="mt-4 w-full bg-amber-500 font-bold text-white hover:bg-amber-600">NỘP BÀI</Button>{answeredCount < questions.length && <p className="mt-2 text-center text-xs leading-5 text-sky-100">Làm đủ {questions.length} câu để mở nút nộp bài.</p>}</div> : <div className="rounded-3xl bg-sky-600 p-5 text-white shadow-lg shadow-sky-100"><div className="flex items-center justify-between"><span className="font-bold">Luyện tập tự do</span><BookOpen className="size-5 text-amber-200"/></div><p className="mt-2 text-sm leading-6 text-sky-50">Không giới hạn thời gian. Nếu sai, đọc gợi ý rồi bấm “Đã hiểu” để xóa đáp án và làm lại từ đầu.</p><div className="mt-4 flex justify-between border-t border-white/20 pt-3 text-sm"><span>Đã luyện</span><b>{answeredCount}/{questions.length}</b></div>{canSubmit && <Button onClick={() => setSubmitted(true)} className="mt-4 w-full bg-white font-bold text-sky-700 hover:bg-sky-50">XEM TỔNG KẾT</Button>}</div>}
+          {mode === 'survival' ? <div className={`overflow-hidden rounded-3xl p-5 text-white shadow-lg ${isBossStage ? 'bg-gradient-to-br from-rose-800 to-slate-950' : 'bg-gradient-to-br from-amber-500 to-orange-700'}`}>
+            <div className="flex items-center justify-between"><span className="font-black uppercase tracking-wider">Survival · Màn {survivalStage + 1}</span><Clock3 className="size-5 text-white"/></div>
+            <strong suppressHydrationWarning className="mt-2 block font-mono text-4xl tracking-tight">{formatTime(secondsLeft)}</strong>
+            <div className="mt-3 rounded-2xl bg-white/15 p-3">
+              {isBossStage
+                ? <img src="chicken-boss.png" alt="Gà Boss" className="mx-auto h-28 w-28 object-contain" style={{ transform: `scale(${1 + stageCorrect * 0.035 + (3 - survivalLives) * 0.08})` }}/>
+                : <div aria-label={`Phương tiện: ${stageName}`} className="mx-auto h-24 w-36 bg-no-repeat" style={{ backgroundImage: 'url(survival-vehicles.png)', backgroundSize: '600% 100%', backgroundPosition: `${vehicleIndex * 20}% center` }}/>
+              }
+              <p className="mt-1 text-center font-black">{stageName}</p>
+            </div>
+            <div className="mt-4 flex justify-between text-sm"><span>Tiến độ màn</span><b>{stageCorrect}/{SURVIVAL_TARGET}</b></div>
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-black/20"><div className="h-full bg-white transition-all" style={{ width: `${stageCorrect * 10}%` }}/></div>
+            <div className="mt-4 flex items-center justify-between border-t border-white/20 pt-3"><span className="text-sm">Máu</span><span className="text-xl" aria-label={`${survivalLives} máu`}>{'❤️'.repeat(survivalLives)}{'🖤'.repeat((isBossStage ? 3 : 5) - survivalLives)}</span></div>
+            <p className="mt-3 text-xs leading-5 text-white/85">Qua màn: nâng cấp phương tiện và cộng 01:00. Sai: quân gà tràn vào màn hình.</p>
+          </div> : mode === 'test' ? <div className="rounded-3xl bg-[#123c5a] p-5 text-white shadow-lg shadow-sky-100"><div className="mb-3 flex items-center justify-between"><span className="text-sm text-sky-100">Thời gian còn lại</span><Clock3 className="size-5 text-amber-300"/></div><strong suppressHydrationWarning className="font-mono text-3xl tracking-tight">{formatTime(secondsLeft)}</strong><div className="mt-4 flex justify-between border-t border-white/15 pt-3 text-sm"><span>Đã làm</span><b>{answeredCount}/{questions.length}</b></div><Button disabled={!canSubmit} onClick={() => setSubmitted(true)} className="mt-4 w-full bg-amber-500 font-bold text-white hover:bg-amber-600">NỘP BÀI</Button>{answeredCount < questions.length && <p className="mt-2 text-center text-xs leading-5 text-sky-100">Làm đủ {questions.length} câu để mở nút nộp bài.</p>}</div> : <div className="rounded-3xl bg-sky-600 p-5 text-white shadow-lg shadow-sky-100"><div className="flex items-center justify-between"><span className="font-bold">Luyện tập có trợ giúp</span><BookOpen className="size-5 text-amber-200"/></div><p className="mt-2 text-sm leading-6 text-sky-50">Sai nhiều sẽ làm màn hình nứt. Dùng vật phẩm trong tủ cấp cứu trước khi máu về 0.</p><div className="mt-4 flex justify-between border-t border-white/20 pt-3 text-sm"><span>Đã luyện</span><b>{answeredCount}/{questions.length}</b></div>{canSubmit && <Button onClick={() => setSubmitted(true)} className="mt-4 w-full bg-white font-bold text-sky-700 hover:bg-sky-50">XEM TỔNG KẾT</Button>}</div>}
+          {mode === 'practice' && <div className="overflow-hidden rounded-3xl border border-rose-100 bg-white shadow-sm">
+            <div className="grid grid-cols-[72px_1fr] gap-3 p-4">
+              {rankIndex >= 0 ? <div aria-label={`Avatar ${rankName}`} className="h-24 w-[72px] bg-contain bg-no-repeat" style={{ backgroundImage: 'url(duck-commando-ranks.png)', backgroundSize: '500% 100%', backgroundPosition: `${rankIndex * 25}% center` }} /> : <img src="duck-learn.png" alt="Vịt Tân Binh" className="h-20 w-20 rounded-2xl object-cover" />}
+              <div><p className="text-xs font-bold uppercase tracking-wider text-amber-700">{rankName}</p><strong className="mt-1 block text-lg text-slate-900">Chuỗi đúng: {correctStreak}</strong><p className="text-xs text-slate-500">Kỷ lục: {bestStreak} · Mốc tiếp: {correctStreak < 10 ? 10 : correctStreak < 20 ? 20 : correctStreak < 30 ? 30 : correctStreak < 40 ? 40 : '100%'}</p></div>
+            </div>
+            <div className="border-t border-rose-100 bg-rose-50 p-4"><div className="flex items-center justify-between text-sm"><strong className="text-rose-900">Máu còn lại</strong><span className="font-bold text-rose-700">{Math.max(0, maxDamage - damage)}/{maxDamage}</span></div><div className="mt-2 h-2.5 overflow-hidden rounded-full bg-rose-200"><div className="h-full bg-rose-500 transition-all" style={{ width: `${100 - damagePercent}%` }} /></div><Button onClick={() => setAidOpen(true)} disabled={damage === 0 || gameOver} className="mt-3 w-full bg-emerald-600 font-bold hover:bg-emerald-700">🧰 Mở tủ cấp cứu</Button></div>
+          </div>}
           <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{questions.map((item, index) => { const done = isAnswerComplete(item, answers[item.id]); const marked = flagged.includes(item.id); return <button aria-label={`Mở câu ${index + 1}`} key={item.id} onClick={() => setQuestionIndex(index)} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-700 ring-offset-2' : ''} ${marked ? 'bg-indigo-400 text-white' : done ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{index + 1}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-sky-500"/>Câu đã làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-200"/>Câu chưa làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-indigo-400"/>Đã đánh dấu để xem lại</span></div></div>
           <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Sparkles className="size-5 text-amber-600"/><strong className="text-amber-950">Từ vựng của Vịt</strong></div><button onClick={() => setVocabulary(randomVocabulary(grade))} className="rounded-full p-2 text-amber-700 transition hover:bg-amber-100" aria-label="Đổi ba từ vựng"><RefreshCw className="size-4"/></button></div><div className="mt-3 grid gap-3">{vocabulary.map((item) => <div key={item.word} className="rounded-2xl bg-white p-3 shadow-sm"><strong className="text-sky-800">{item.word}</strong><span className="ml-2 text-sm text-amber-800">{item.meaning}</span><p className="mt-1 text-sm leading-5 text-slate-600">{item.example}</p></div>)}</div></div>
         </aside>
       </div>
-      {hintOpen && lockedQuestion === question.id && <dialog open className="fixed inset-0 z-[70] m-0 grid h-screen w-screen max-w-none place-items-center bg-slate-950/45 p-4" aria-labelledby="hint-title"><div className="w-full max-w-lg rounded-[28px] border border-amber-200 bg-white p-6 shadow-2xl"><div className="flex items-center gap-3"><img src="duck-learn.png" alt="Mascot vịt đưa gợi ý" className="h-16 w-16 rounded-2xl object-cover"/><div><p className="text-sm font-bold uppercase tracking-wider text-amber-700">Hint</p><h2 id="hint-title" className="text-xl font-extrabold text-slate-900">Chưa đúng — xem gợi ý nhé</h2></div></div><p className="mt-4 rounded-2xl bg-amber-50 p-4 leading-7 text-slate-700">{question.hint ?? 'Read the instruction carefully. Check the tense marker, word form, sentence structure, or the exact evidence in the passage before trying again.'}</p><p className="mt-3 text-sm text-slate-500">Đáp án chưa được tiết lộ. Khi bấm nút dưới đây, câu trả lời vừa nhập sẽ bị xóa để em làm lại từ đầu.</p><Button onClick={retryAfterHint} autoFocus className="mt-5 w-full rounded-xl bg-amber-500 font-bold text-white hover:bg-amber-600">Đã hiểu · Làm lại</Button></div></dialog>}
+      {mode === 'practice' && damage > 0 && <div aria-hidden="true" className="pointer-events-none fixed inset-y-0 right-0 z-[60] overflow-hidden transition-all duration-500" style={{ width: `${damagePercent}%`, background: 'linear-gradient(115deg, transparent 0%, rgba(35,16,22,.08) 45%, rgba(20,10,14,.24) 100%)', boxShadow: damagePercent >= 50 ? 'inset 18px 0 35px rgba(10,5,8,.28)' : undefined }}>
+        {Array.from({ length: Math.min(damage, maxDamage) }, (_, index) => <div key={index} className="absolute" style={{ left: `${12 + ((index * 31) % 76)}%`, top: `${10 + ((index * 23) % 78)}%` }}><span className="block h-6 w-6 rounded-full border-[5px] border-slate-800/80 bg-slate-950 shadow-[0_0_0_5px_rgba(255,255,255,.3),0_0_18px_rgba(0,0,0,.8)]"/><i className="absolute left-3 top-3 h-0.5 w-24 origin-left rotate-[22deg] bg-slate-700/60"/><i className="absolute left-3 top-3 h-0.5 w-20 origin-left -rotate-[48deg] bg-slate-700/50"/><i className="absolute left-3 top-3 h-0.5 w-16 origin-left rotate-[105deg] bg-slate-700/50"/></div>)}
+      </div>}
+      {mode === 'survival' && chickenSpawns.length > 0 && <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[58] overflow-hidden bg-amber-950/10">{chickenSpawns.map((chicken) => <img key={chicken.id} src="chicken-army.png" alt="" className="chicken-invade absolute object-contain drop-shadow-2xl" style={{ left: `${chicken.x}%`, top: `${chicken.y}%`, width: chicken.size, height: chicken.size, rotate: `${chicken.rotate}deg`, animationDelay: `${chicken.delay}s` }}/>)}</div>}
+      {mode === 'survival' && isBossStage && !survivalEnded && <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[57] grid place-items-center overflow-hidden"><img src="chicken-boss.png" alt="" className="max-h-[82vh] max-w-[82vw] object-contain opacity-25 drop-shadow-2xl transition-transform duration-700" style={{ transform: `scale(${0.7 + stageCorrect * 0.055 + (3 - survivalLives) * 0.12})` }}/></div>}
+      {mode === 'survival' && stageUpNotice && <div role="status" className="pointer-events-none fixed inset-0 z-[90] grid place-items-center bg-sky-950/35 p-4"><div className="rounded-[28px] border-4 border-amber-300 bg-slate-950/95 px-8 py-7 text-center text-white shadow-2xl"><p className="text-sm font-black uppercase tracking-[.22em] text-amber-300">Qua màn!</p><p className="mt-2 text-3xl font-black">{stageUpNotice}</p></div></div>}
+      {(mode === 'practice' || mode === 'survival') && hitPulse > 0 && <div key={hitPulse} aria-hidden="true" className="hit-flash pointer-events-none fixed inset-0 z-[65] grid place-items-center bg-rose-700/35"><div className="h-32 w-32 rounded-full border-[14px] border-white/55 shadow-[0_0_80px_32px_rgba(225,29,72,.75)]" /></div>}
+      {hintOpen && !gameOver && lockedQuestion === question.id && <dialog open className="fixed inset-0 z-[70] m-0 grid h-screen w-screen max-w-none place-items-center bg-slate-950/45 p-4" aria-labelledby="hint-title"><div className="w-full max-w-lg rounded-[28px] border border-amber-200 bg-white p-6 shadow-2xl"><div className="flex items-center gap-3"><img src="duck-learn.png" alt="Mascot vịt đưa gợi ý" className="h-16 w-16 rounded-2xl object-cover"/><div><p className="text-sm font-bold uppercase tracking-wider text-amber-700">Sai lần {wrongAttempts[question.id] ?? 1}</p><h2 id="hint-title" className="text-xl font-extrabold text-slate-900">Chưa đúng — xem gợi ý nhé</h2></div></div><p className="mt-4 rounded-2xl bg-amber-50 p-4 leading-7 text-slate-700">{question.hint ?? 'Read the instruction carefully. Check the tense marker, word form, sentence structure, or the exact evidence in the passage before trying again.'}</p><p className="mt-3 text-sm text-slate-500">Đáp án chưa được tiết lộ. Câu trả lời sẽ được xóa để em làm lại. {lockSeconds > 0 ? `Hệ thống đang khóa câu trong ${lockSeconds} giây.` : ''}</p><Button onClick={retryAfterHint} disabled={lockSeconds > 0} autoFocus className="mt-5 w-full rounded-xl bg-amber-500 font-bold text-white hover:bg-amber-600 disabled:bg-slate-400">{lockSeconds > 0 ? `🔒 Chờ ${lockSeconds}s` : 'Đã hiểu · Làm lại'}</Button></div></dialog>}
+      {aidOpen && !gameOver && <dialog open className="fixed inset-0 z-[80] m-0 grid h-screen w-screen max-w-none place-items-center bg-emerald-950/55 p-4" aria-labelledby="aid-title"><div className="w-full max-w-xl rounded-[28px] border-4 border-emerald-400 bg-slate-950 p-6 text-white shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-[.18em] text-emerald-300">Medical crate</p><h2 id="aid-title" className="text-2xl font-black">🧰 Tủ cấp cứu</h2><p className="mt-1 text-sm text-slate-300">Chọn một vật phẩm để xóa vết thương. Vật phẩm đã dùng sẽ mất khỏi kho.</p></div><button onClick={() => setAidOpen(false)} className="rounded-full bg-white/10 p-2 hover:bg-white/20" aria-label="Đóng tủ cấp cứu"><X className="size-5"/></button></div><div className="mt-5 grid gap-3 sm:grid-cols-3">{AID_ITEMS.map((item) => <button key={item.kind} onClick={() => useAid(item.kind)} disabled={aidInventory[item.kind] <= 0 || damage <= 0} className={`rounded-2xl border-2 p-4 text-left transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-35 ${item.color}`}><span className="text-4xl">{item.icon}</span><strong className="mt-2 block">{item.name}</strong><span className="text-sm">Hồi {item.heal} máu · Còn {aidInventory[item.kind]}</span></button>)}</div><div className="mt-5 rounded-2xl bg-white/10 p-4"><div className="flex justify-between text-sm"><span>Mức thương tích</span><strong>{damage}/{maxDamage}</strong></div><div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-700"><div className="h-full bg-rose-500" style={{ width: `${damagePercent}%` }}/></div></div></div></dialog>}
+      {gameOver && <dialog open className="fixed inset-0 z-[100] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/90 p-4" aria-labelledby="game-over-title"><div className="w-full max-w-md rounded-[28px] border-2 border-rose-500 bg-slate-900 p-6 text-center text-white shadow-2xl"><img src="duck-hospital.png" alt="Vịt băng bó đang hồi phục trong bệnh viện" className="mx-auto h-48 w-48 object-contain drop-shadow-2xl"/><p className="mt-2 text-sm font-bold uppercase tracking-[.22em] text-rose-300">Vịt cần hồi phục</p><h2 id="game-over-title" className="mt-2 text-3xl font-black">Màn hình đã bị che hoàn toàn</h2><p className="mt-3 leading-7 text-slate-300">Số lần sai đã đạt 20% số câu của bài. Vịt đã được băng bó an toàn; em cần làm lại từ đầu và dùng tủ cấp cứu sớm hơn ở lượt tới.</p><Button onClick={resetExam} autoFocus className="mt-5 w-full bg-rose-600 py-6 text-base font-black hover:bg-rose-700"><RotateCcw/> Làm lại từ đầu</Button></div></dialog>}
+      {survivalGameOver && <dialog open className="fixed inset-0 z-[110] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/90 p-4" aria-labelledby="survival-over-title"><div className="w-full max-w-lg rounded-[30px] border-2 border-amber-400 bg-slate-900 p-6 text-center text-white shadow-2xl"><div className="grid grid-cols-2 items-end gap-2"><img src="duck-hospital.png" alt="Vịt đang hồi phục" className="h-44 w-full object-contain"/><img src={isBossStage ? 'chicken-boss.png' : 'chicken-army.png'} alt={isBossStage ? 'Gà Boss' : 'Quân đội gà'} className="h-44 w-full object-contain"/></div><p className="mt-2 text-sm font-bold uppercase tracking-[.22em] text-amber-300">Survival kết thúc</p><h2 id="survival-over-title" className="mt-2 text-3xl font-black">{survivalReason === 'time' ? 'Hết thời gian!' : 'Vịt đã hết máu!'}</h2><p className="mt-3 leading-7 text-slate-300">Bạn đã tới màn {survivalStage + 1} · {stageName}, đạt chuỗi cao nhất {bestStreak}. Bắt đầu lại với 02:00 và 5 máu nhé.</p><Button onClick={resetExam} autoFocus className="mt-5 w-full bg-amber-500 py-6 text-base font-black text-slate-950 hover:bg-amber-400"><RotateCcw/> Chơi Survival lại</Button></div></dialog>}
       {dictionary && <div role="dialog" aria-live="polite" onClick={(event) => event.stopPropagation()} className="fixed z-50 w-72 rounded-2xl border border-sky-200 bg-white p-4 shadow-2xl" style={{ left: Math.max(12, dictionary.x), top: Math.max(12, dictionary.y) }}><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2 text-sky-800"><Languages className="size-5"/><strong>Từ điển Anh–Việt</strong></div><button onClick={() => setDictionary(null)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Đóng từ điển"><X className="size-4"/></button></div>{dictionary.word && <p className="mt-3 break-words text-base font-bold text-slate-900">{dictionary.word}</p>}<p className={`mt-1 break-words text-sm leading-6 ${dictionary.status === 'error' ? 'text-rose-700' : 'text-slate-700'}`}>{dictionary.translation}</p>{dictionary.status === 'ready' && <p className="mt-2 text-[11px] text-slate-400">Bản dịch tự động · MyMemory</p>}</div>}
     </main>
   );

@@ -132,3 +132,28 @@ body {
     @apply font-sans;
   }
 }
+
+@keyframes hit-flash {
+  0% { opacity: 0; transform: scale(0.7); }
+  12% { opacity: 0.9; transform: scale(1); }
+  38% { opacity: 0.32; }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+
+.hit-flash {
+  animation: hit-flash 680ms ease-out both;
+}
+
+@keyframes chicken-invade {
+  0% { opacity: 0; transform: translateY(80px) scale(0.45) rotate(-12deg); }
+  70% { opacity: 1; transform: translateY(-8px) scale(1.08) rotate(4deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+
+.chicken-invade {
+  animation: chicken-invade 520ms cubic-bezier(.2,.9,.25,1.25) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hit-flash, .chicken-invade { animation-duration: 1ms; }
+}

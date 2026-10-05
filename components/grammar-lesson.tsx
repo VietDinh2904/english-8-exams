@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { GrammarLesson as GrammarLessonData } from '@/lib/grammar-lessons9';
 import { unitEnrichment } from '@/lib/unit-enrichment';
 
-export function GrammarLesson({ grade, lesson }: { grade: 8 | 9 | 10; lesson: GrammarLessonData }) {
+export function GrammarLesson({ grade, lesson }: { grade: 6 | 7 | 8 | 9 | 10 | 11 | 12; lesson: GrammarLessonData }) {
   const unit = lesson.unit;
   const enrichment = unitEnrichment[grade][unit];
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -34,22 +34,27 @@ export function GrammarLesson({ grade, lesson }: { grade: 8 | 9 | 10; lesson: Gr
   };
 
   return <details className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" open>
-    <summary className="cursor-pointer px-5 py-4 text-base font-bold text-amber-950">Lý thuyết: từ vựng · phát âm · ngữ pháp · English {grade} · Unit {unit}</summary>
+    <summary className="cursor-pointer px-5 py-4 text-base font-bold text-amber-950">Bài học Unit {unit}: phát âm · từ vựng · ngữ pháp · English {grade}</summary>
     <div className="space-y-4 border-t border-amber-200 p-4 sm:p-5">
-      {enrichment && <section className="rounded-2xl border border-sky-100 bg-white p-4 sm:p-5">
-        <h2 className="text-lg font-bold text-sky-900">Từ vựng theo chủ đề</h2>
-        <p className="mt-1 text-base leading-7 text-slate-700">Đọc phiên âm, học nghĩa và đặt từ vào một câu hoàn chỉnh.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">{enrichment.vocabulary.map((item) => <div key={item.word} className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-base leading-7">
-          <p lang="en" className="font-bold text-sky-950">{item.word} <span className="font-normal text-sky-700">{item.ipa}</span></p>
-          <p className="font-medium text-amber-900">{item.meaning}</p>
-          <p lang="en" className="text-slate-700">{item.example}</p>
-        </div>)}</div>
-      </section>}
       {enrichment && <section className="rounded-2xl border border-sky-100 bg-white p-4 sm:p-5">
         <h2 className="text-lg font-bold text-sky-900">Phát âm · {enrichment.pronunciation.title}</h2>
         <p className="mt-3 text-base leading-7 text-slate-700">{enrichment.pronunciation.guidance}</p>
         <div className="mt-3 rounded-xl bg-sky-50 p-3 text-base leading-7 text-sky-950" lang="en">{enrichment.pronunciation.examples}</div>
         <p className="mt-3 text-sm leading-6 text-slate-600">Hãy đọc thành tiếng và so sánh âm hoặc vị trí trọng âm. Phần này không có bài nghe.</p>
+      </section>}
+      {enrichment && <section className="overflow-hidden rounded-2xl border border-sky-100 bg-white">
+        <div className="border-b border-sky-100 px-4 py-4 sm:px-5"><h2 className="text-lg font-bold text-sky-900">Từ vựng cốt lõi</h2></div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[680px] border-collapse text-left text-sm sm:text-base">
+            <thead className="bg-sky-50 text-sky-950"><tr><th className="px-4 py-3">Từ / phiên âm</th><th className="px-4 py-3">Từ loại</th><th className="px-4 py-3">Nghĩa</th><th className="px-4 py-3">Ví dụ</th></tr></thead>
+            <tbody>{enrichment.vocabulary.map((item) => <tr key={item.word} className="border-t border-sky-100 align-top">
+              <td className="px-4 py-3"><strong lang="en" className="text-sky-950">{item.word}</strong><span className="mt-1 block text-sky-700">{item.ipa}</span></td>
+              <td className="px-4 py-3 font-medium text-amber-900">{item.partOfSpeech ?? '—'}</td>
+              <td className="px-4 py-3 text-slate-700">{item.meaning}</td>
+              <td lang="en" className="px-4 py-3 text-slate-700">{item.example}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
       </section>}
       {lesson.topics.map((topic) => <section key={topic.title} className="rounded-2xl border border-sky-100 bg-white p-4 sm:p-5">
         <h2 className="text-lg font-bold text-sky-900">{topic.title}</h2>
@@ -74,8 +79,8 @@ export function GrammarLesson({ grade, lesson }: { grade: 8 | 9 | 10; lesson: Gr
                   <span><strong>{String.fromCharCode(65 + optionIndex)}.</strong> {option}</span>
                 </label>)}
               </div>
-              {triedWrong.length > 0 && !isCorrect && <p className="mt-3 rounded-xl bg-rose-50 p-3 text-base leading-7 text-rose-900" role="status">Chưa đúng. Phương án sai đã bị khóa; hãy chọn phương án khác.</p>}
-              {isCorrect && <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-base leading-7 text-emerald-900" role="status"><strong>Đúng rồi! Đáp án: {String.fromCharCode(65 + correctIndex)}. {question.options[correctIndex]}.</strong> {question.explanation}</p>}
+              {triedWrong.length > 0 && !isCorrect && <output className="mt-3 block rounded-xl bg-rose-50 p-3 text-base leading-7 text-rose-900">Chưa đúng. Phương án sai đã bị khóa; hãy chọn phương án khác.</output>}
+              {isCorrect && <output className="mt-3 block rounded-xl bg-emerald-50 p-3 text-base leading-7 text-emerald-900"><strong>Đúng rồi! Đáp án: {String.fromCharCode(65 + correctIndex)}. {question.options[correctIndex]}.</strong> {question.explanation}</output>}
             </fieldset>
           <div className="flex items-center justify-between gap-3">
             <button type="button" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl border border-sky-300 px-4 py-2.5 font-semibold text-sky-800 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40">Câu trước</button>

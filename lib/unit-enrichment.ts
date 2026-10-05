@@ -1,6 +1,7 @@
 import type { Exam, Question } from './exams';
+import { extendedEnrichment, type ExtendedGrade } from './extended-grades';
 
-export type VocabularyEntry = { word: string; ipa: string; meaning: string; example: string };
+export type VocabularyEntry = { word: string; ipa: string; partOfSpeech?: string; meaning: string; example: string };
 export type PronunciationEntry = {
   title: string;
   guidance: string;
@@ -11,15 +12,41 @@ export type PronunciationEntry = {
   explanation: string;
   prompt?: string;
 };
-export type UnitEnrichment = { vocabulary: [VocabularyEntry, VocabularyEntry, VocabularyEntry, VocabularyEntry]; pronunciation: PronunciationEntry };
+export type UnitEnrichment = { vocabulary: VocabularyEntry[]; pronunciation: PronunciationEntry };
 
-const v = (word: string, ipa: string, meaning: string, example: string): VocabularyEntry => ({ word, ipa, meaning, example });
+const VERBS = new Set(['harvest', 'herd', 'concentrate', 'preserve', 'evacuate', 'recycle', 'perform', 'donate']);
+const ADJECTIVES = new Set(['picturesque', 'endangered', 'digital', 'habitable', 'bustling', 'congested', 'optimistic', 'memorable', 'embarrassed', 'independent', 'renewable', 'portable', 'confident', 'unforgettable', 'thrilling', 'embarrassing', 'unpleasant', 'equal']);
+const PHRASAL_VERBS = new Set(['hang out', 'pass down', 'carry out']);
+const VERB_PHRASES = new Set(['get enough sleep', 'manage time', 'put up a tent', 'give a performance']);
+const ADJECTIVE_PHRASES = new Set(['stressed out', 'well-balanced', 'family-oriented', 'face-to-face']);
+const ADVERB_PHRASES = new Set(['by rote']);
+
+function inferPartOfSpeech(word: string) {
+  if (PHRASAL_VERBS.has(word)) return 'phrasal verb';
+  if (VERB_PHRASES.has(word)) return 'verb phrase';
+  if (ADJECTIVE_PHRASES.has(word)) return 'adjective phrase';
+  if (ADVERB_PHRASES.has(word)) return 'adverb phrase';
+  if (VERBS.has(word)) return 'verb';
+  if (ADJECTIVES.has(word)) return 'adjective';
+  return word.includes(' ') ? 'noun phrase' : 'noun';
+}
+
+const v = (word: string, ipa: string, meaning: string, example: string, partOfSpeech?: string): VocabularyEntry => ({ word, ipa, partOfSpeech: partOfSpeech ?? inferPartOfSpeech(word), meaning, example });
 const p = (title: string, guidance: string, examples: string, options: PronunciationEntry['options'], underlines: PronunciationEntry['underlines'], answer: number, explanation: string, prompt?: string): PronunciationEntry => ({ title, guidance, examples, options, underlines, answer, explanation, prompt });
 
 // Original examples and questions aligned to the public Unit topic outlines; no source exercises are reproduced.
-export const unitEnrichment: Record<8 | 9 | 10, Record<number, UnitEnrichment>> = {
+const coreUnitEnrichment: Record<8 | 9 | 10, Record<number, UnitEnrichment>> = {
   8: {
-    1: { vocabulary: [v('leisure', '/ˈleʒə(r)/', 'thời gian rảnh', 'I read comics in my leisure time.'), v('origami', '/ˌɒrɪˈɡɑːmi/', 'nghệ thuật gấp giấy', 'We made origami birds after class.'), v('hang out', '/hæŋ aʊt/', 'đi chơi, dành thời gian cùng bạn bè', 'My friends hang out at the park.'), v('DIY', '/ˌdiː aɪ ˈwaɪ/', 'tự làm hoặc sửa đồ', 'Dad enjoys simple DIY projects.')], pronunciation: p('/ʊ/ và /uː/', 'Âm /ʊ/ ngắn, môi tròn nhẹ; /uː/ dài hơn và môi tròn rõ hơn.', 'book /bʊk/ · cook /kʊk/ · moon /muːn/', ['book', 'cook', 'look', 'moon'], ['oo', 'oo', 'oo', 'oo'], 3, '“Moon” có /uː/ dài; ba từ còn lại có /ʊ/ ngắn.') },
+    1: { vocabulary: [
+      v('leisure', '/ˈleʒə(r)/', 'thời gian rảnh', 'I use part of my leisure time to read.', 'noun'),
+      v('origami', '/ˌɒrɪˈɡɑːmi/', 'nghệ thuật gấp giấy', 'We made origami animals after class.', 'noun'),
+      v('hang out', '/hæŋ aʊt/', 'đi chơi, dành thời gian cùng bạn bè', 'My friends hang out at the sports centre.', 'phrasal verb'),
+      v('DIY', '/ˌdiː aɪ ˈwaɪ/', 'hoạt động tự làm hoặc sửa đồ', 'Dad enjoys simple DIY projects.', 'noun / adjective'),
+      v('unwind', '/ʌnˈwaɪnd/', 'thư giãn sau khi học hoặc làm việc', 'A short walk helps me unwind.', 'verb'),
+      v('craft kit', '/krɑːft kɪt/', 'bộ dụng cụ thủ công', 'Her craft kit contains paper and coloured pens.', 'noun phrase'),
+      v('board game', '/ˈbɔːd ɡeɪm/', 'trò chơi trên bàn', 'We play a board game on rainy afternoons.', 'noun phrase'),
+      v('detest', '/dɪˈtest/', 'rất không thích', 'He detests wasting his free time.', 'verb'),
+    ], pronunciation: p('/ʊ/ và /uː/', 'Âm /ʊ/ ngắn, môi tròn nhẹ; /uː/ dài hơn và môi tròn rõ hơn.', 'book /bʊk/ · cook /kʊk/ · moon /muːn/', ['book', 'cook', 'look', 'moon'], ['oo', 'oo', 'oo', 'oo'], 3, '“Moon” có /uː/ dài; ba từ còn lại có /ʊ/ ngắn.') },
     2: { vocabulary: [v('harvest', '/ˈhɑːvɪst/', 'thu hoạch', 'Neighbours help each other harvest rice.'), v('orchard', '/ˈɔːtʃəd/', 'vườn cây ăn quả', 'The family grows oranges in an orchard.'), v('herd', '/hɜːd/', 'chăn dắt một đàn vật nuôi', 'She helps herd the cattle home.'), v('picturesque', '/ˌpɪktʃəˈresk/', 'đẹp như tranh', 'The riverside village is picturesque.')], pronunciation: p('/ə/ và /ɪ/', 'Âm /ə/ là âm rất nhẹ, thường nằm ở âm tiết không nhấn; /ɪ/ ngắn nhưng rõ hơn.', 'about /əˈbaʊt/ · away /əˈweɪ/ · village /ˈvɪlɪdʒ/', ['about', 'away', 'around', 'village'], ['a', 'a', 'a', 'i'], 3, 'Chữ gạch dưới trong “village” đọc /ɪ/; ba từ kia bắt đầu bằng /ə/.') },
     3: { vocabulary: [v('pressure', '/ˈpreʃə(r)/', 'áp lực', 'Too many tasks can create pressure.'), v('bullying', '/ˈbʊliɪŋ/', 'việc bắt nạt', 'Our class speaks up against bullying.'), v('deadline', '/ˈdedlaɪn/', 'hạn cuối', 'I wrote the project deadline in my diary.'), v('concentrate', '/ˈkɒnsntreɪt/', 'tập trung', 'A quiet desk helps me concentrate.')], pronunciation: p('/ʊə/ và /ɔɪ/', 'Âm /ɔɪ/ chuyển từ /ɔ/ sang /ɪ/ như trong boy; /ʊə/ bắt đầu bằng /ʊ/ rồi lướt sang /ə/ trong một số giọng Anh.', 'boy /bɔɪ/ · choice /tʃɔɪs/ · cure /kjʊə(r)/', ['tour', 'cure', 'pure', 'choice'], ['our', 'ure', 'ure', 'oi'], 3, '“Choice” có âm /ɔɪ/; các từ còn lại không có âm này. Cách đọc /ʊə/ có thể khác nhau giữa các giọng Anh.', 'Which word contains the /ɔɪ/ sound?') },
     4: { vocabulary: [v('ethnic group', '/ˈeθnɪk ɡruːp/', 'nhóm dân tộc', 'Each ethnic group has its own traditions.'), v('stilt house', '/stɪlt haʊs/', 'nhà sàn', 'The family welcomed us into their stilt house.'), v('costume', '/ˈkɒstjuːm/', 'trang phục', 'The performers wore colourful costumes.'), v('folk dance', '/fəʊk dɑːns/', 'điệu múa dân gian', 'We learnt a folk dance at the festival.')], pronunciation: p('/k/ và /ɡ/', '/k/ là âm vô thanh, không rung cổ; /ɡ/ là âm hữu thanh, có rung cổ.', 'kite /kaɪt/ · school /skuːl/ · garden /ˈɡɑːdn/', ['kite', 'kitchen', 'school', 'garden'], ['k', 'k', 'ch', 'g'], 3, '“Garden” bắt đầu bằng /ɡ/ hữu thanh; ba từ còn lại có /k/.') },
@@ -33,7 +60,16 @@ export const unitEnrichment: Record<8 | 9 | 10, Record<number, UnitEnrichment>> 
     12: { vocabulary: [v('galaxy', '/ˈɡæləksi/', 'thiên hà', 'Our galaxy contains many stars.'), v('gravity', '/ˈɡrævəti/', 'trọng lực', 'Gravity keeps us on the ground.'), v('spacecraft', '/ˈspeɪskrɑːft/', 'tàu vũ trụ', 'The spacecraft sent back pictures.'), v('habitable', '/ˈhæbɪtəbl/', 'có thể sinh sống', 'Scientists seek habitable planets.')], pronunciation: p('/t/ và /θ/ — luyện phát âm bổ trợ', 'Với /θ/, đặt đầu lưỡi nhẹ giữa hai hàm răng và thổi hơi; /t/ chặn rồi bật hơi ở lợi trên.', 'ten /ten/ · time /taɪm/ · think /θɪŋk/', ['ten', 'time', 'team', 'think'], ['t', 't', 't', 'th'], 3, '“Think” bắt đầu bằng /θ/; ba từ còn lại bắt đầu bằng /t/.') },
   },
   9: {
-    1: { vocabulary: [v('artisan', '/ˌɑːtɪˈzæn/', 'người thợ thủ công', 'An artisan taught us to shape clay.'), v('handicraft', '/ˈhændikrɑːft/', 'đồ thủ công', 'The market sells local handicrafts.'), v('preserve', '/prɪˈzɜːv/', 'gìn giữ', 'We hope to preserve this old craft.'), v('speciality', '/ˌspeʃiˈæləti/', 'đặc sản', 'Rice cakes are a local speciality.')], pronunciation: p('/æ/, /ɑː/ và /e/', '/æ/ mở miệng rộng; /ɑː/ là âm dài ở phía sau; /e/ ngắn và miệng mở vừa.', 'cat /kæt/ · park /pɑːk/ · bed /bed/', ['cat', 'map', 'hand', 'park'], ['a', 'a', 'a', 'ar'], 3, '“Park” có /ɑː/ dài; ba từ còn lại có /æ/.') },
+    1: { vocabulary: [
+      v('artisan', '/ˌɑːtɪˈzæn/', 'người thợ thủ công', 'An artisan showed us how to shape clay.', 'noun'),
+      v('handicraft', '/ˈhændikrɑːft/', 'đồ thủ công', 'The weekend market sells local handicrafts.', 'noun'),
+      v('preserve', '/prɪˈzɜːv/', 'gìn giữ, bảo tồn', 'The club works to preserve an old craft.', 'verb'),
+      v('speciality', '/ˌspeʃiˈæləti/', 'đặc sản', 'Sesame cakes are a local speciality.', 'noun'),
+      v('community helper', '/kəˈmjuːnəti ˈhelpə(r)/', 'người hỗ trợ cộng đồng', 'A community helper makes the neighbourhood safer.', 'noun phrase'),
+      v('pass down', '/pɑːs daʊn/', 'truyền lại cho thế hệ sau', 'Families pass down the skill to younger members.', 'phrasal verb'),
+      v('carry out', '/ˈkæri aʊt/', 'tiến hành, thực hiện', 'Students carry out a survey at the market.', 'phrasal verb'),
+      v('reliable', '/rɪˈlaɪəbl/', 'đáng tin cậy', 'The local repair service is reliable.', 'adjective'),
+    ], pronunciation: p('/æ/, /ɑː/ và /e/', '/æ/ mở miệng rộng; /ɑː/ là âm dài ở phía sau; /e/ ngắn và miệng mở vừa.', 'cat /kæt/ · park /pɑːk/ · bed /bed/', ['cat', 'map', 'hand', 'park'], ['a', 'a', 'a', 'ar'], 3, '“Park” có /ɑː/ dài; ba từ còn lại có /æ/.') },
     2: { vocabulary: [v('bustling', '/ˈbʌslɪŋ/', 'nhộn nhịp', 'The downtown market is bustling.'), v('congested', '/kənˈdʒestɪd/', 'ùn tắc', 'The road is congested at five.'), v('pedestrian', '/pəˈdestriən/', 'người đi bộ', 'Pedestrians use the new crossing.'), v('amenity', '/əˈmiːnəti/', 'tiện ích', 'A nearby library is a useful amenity.')], pronunciation: p('/aʊ/, /əʊ/ và /eə/', 'Chú ý đường lướt của nguyên âm đôi, không đọc thành hai âm tách rời.', 'town /taʊn/ · road /rəʊd/ · square /skweə(r)/', ['town', 'brown', 'crowd', 'road'], ['ow', 'ow', 'ow', 'oa'], 3, '“Road” có /əʊ/; ba từ kia có /aʊ/.') },
     3: { vocabulary: [v('due date', '/ˈdjuː deɪt/', 'ngày đến hạn', 'Write the due date on your calendar.'), v('optimistic', '/ˌɒptɪˈmɪstɪk/', 'lạc quan', 'She remains optimistic about the test.'), v('distraction', '/dɪˈstrækʃn/', 'điều gây xao nhãng', 'Turn off your phone to avoid distractions.'), v('stressed out', '/strest aʊt/', 'căng thẳng quá mức', 'He felt stressed out before the exam.')], pronunciation: p('/h/ và /r/', '/h/ chỉ là luồng hơi; /r/ dùng lưỡi cong nhẹ, không rung mạnh.', 'healthy /ˈhelθi/ · habit /ˈhæbɪt/ · ready /ˈredi/', ['healthy', 'habit', 'homework', 'ready'], ['h', 'h', 'h', 'r'], 3, '“Ready” bắt đầu bằng /r/; ba từ kia bắt đầu bằng /h/.') },
     4: { vocabulary: [v('heritage', '/ˈherɪtɪdʒ/', 'di sản', 'The town protects its cultural heritage.'), v('monument', '/ˈmɒnjumənt/', 'công trình tưởng niệm', 'We visited a stone monument.'), v('preserve', '/prɪˈzɜːv/', 'bảo tồn', 'The museum preserves old photographs.'), v('generation', '/ˌdʒenəˈreɪʃn/', 'thế hệ', 'Stories pass from one generation to another.')], pronunciation: p('/m/ và /l/', 'Với /m/, khép môi và đưa hơi qua mũi; với /l/, đầu lưỡi chạm lợi trên.', 'museum /mjuˈziːəm/ · memory /ˈmeməri/ · landscape /ˈlændskeɪp/', ['museum', 'memory', 'moment', 'landscape'], ['m', 'm', 'm', 'l'], 3, '“Landscape” bắt đầu bằng /l/; ba từ còn lại bắt đầu bằng /m/.') },
@@ -41,7 +77,16 @@ export const unitEnrichment: Record<8 | 9 | 10, Record<number, UnitEnrichment>> 
     6: { vocabulary: [v('generation gap', '/ˌdʒenəˈreɪʃn ɡæp/', 'khoảng cách thế hệ', 'Talking openly can narrow the generation gap.'), v('privacy', '/ˈprɪvəsi/', 'quyền riêng tư', 'Everyone needs some privacy.'), v('independent', '/ˌɪndɪˈpendənt/', 'độc lập', 'She became more independent this year.'), v('family values', '/ˈfæməli ˈvæljuːz/', 'giá trị gia đình', 'They discuss family values at dinner.')], pronunciation: p('/fl/ và /fr/', 'Hai cụm đều bắt đầu bằng /f/; âm thứ hai là /l/ hoặc /r/, không chèn nguyên âm.', 'flower /ˈflaʊə(r)/ · floor /flɔː(r)/ · fresh /freʃ/', ['flower', 'floor', 'flight', 'fresh'], ['fl', 'fl', 'fl', 'fr'], 3, '“Fresh” bắt đầu bằng /fr/; ba từ kia bắt đầu bằng /fl/.') },
   },
   10: {
-    1: { vocabulary: [v('chore', '/tʃɔː(r)/', 'việc nhà', 'We share chores every weekend.'), v('breadwinner', '/ˈbredwɪnə(r)/', 'người kiếm thu nhập chính', 'Both parents are breadwinners.'), v('homemaker', '/ˈhəʊmmeɪkə(r)/', 'người chăm sóc, quản lý nhà', 'A homemaker does valuable work.'), v('family bond', '/ˈfæməli bɒnd/', 'sự gắn kết gia đình', 'Shared meals strengthen family bonds.')], pronunciation: p('/br/, /kr/ và /tr/', 'Đọc hai phụ âm trong mỗi cụm sát nhau, không thêm âm /ə/ ở giữa.', 'bread /bred/ · cream /kriːm/ · tree /triː/', ['bread', 'brown', 'bright', 'cream'], ['br', 'br', 'br', 'cr'], 3, '“Cream” bắt đầu bằng /kr/; ba từ còn lại bắt đầu bằng /br/.') },
+    1: { vocabulary: [
+      v('chore', '/tʃɔː(r)/', 'việc nhà', 'We share the weekly chores fairly.', 'noun'),
+      v('breadwinner', '/ˈbredwɪnə(r)/', 'người kiếm thu nhập chính', 'Both adults are breadwinners in this family.', 'noun'),
+      v('homemaker', '/ˈhəʊmmeɪkə(r)/', 'người chăm sóc, quản lý gia đình', 'A homemaker does valuable unpaid work.', 'noun'),
+      v('family bond', '/ˈfæməli bɒnd/', 'sự gắn kết gia đình', 'Shared meals can strengthen family bonds.', 'noun phrase'),
+      v('household', '/ˈhaʊshəʊld/', 'thuộc gia đình; hộ gia đình', 'Everyone has a household responsibility.', 'adjective / noun'),
+      v('routine', '/ruːˈtiːn/', 'thói quen, hoạt động thường lệ', 'Our evening routine begins after dinner.', 'noun'),
+      v('burden', '/ˈbɜːdn/', 'gánh nặng', 'Sharing tasks reduces the burden on one person.', 'noun'),
+      v('groceries', '/ˈɡrəʊsəriz/', 'thực phẩm và đồ dùng mua thường xuyên', 'My brother buys groceries on Saturday.', 'plural noun'),
+    ], pronunciation: p('/br/, /kr/ và /tr/', 'Đọc hai phụ âm trong mỗi cụm sát nhau, không thêm âm /ə/ ở giữa.', 'bread /bred/ · cream /kriːm/ · tree /triː/', ['bread', 'brown', 'bright', 'cream'], ['br', 'br', 'br', 'cr'], 3, '“Cream” bắt đầu bằng /kr/; ba từ còn lại bắt đầu bằng /br/.') },
     2: { vocabulary: [v('carbon footprint', '/ˌkɑːbən ˈfʊtprɪnt/', 'lượng khí thải do hoạt động tạo ra', 'Cycling can reduce your carbon footprint.'), v('renewable', '/rɪˈnjuːəbl/', 'có thể tái tạo', 'Sunlight is a renewable energy source.'), v('recycle', '/ˌriːˈsaɪkl/', 'tái chế', 'We recycle paper at school.'), v('habitat', '/ˈhæbɪtæt/', 'môi trường sống', 'The forest is a natural habitat.')], pronunciation: p('/kl/, /pl/, /gr/ và /pr/', 'Tập chuyển thẳng từ phụ âm đầu sang âm tiếp theo, đặc biệt không thêm một nguyên âm đệm.', 'clean /kliːn/ · plant /plɑːnt/ · green /ɡriːn/ · prize /praɪz/', ['clean', 'climb', 'clap', 'plant'], ['cl', 'cl', 'cl', 'pl'], 3, '“Plant” bắt đầu bằng /pl/; ba từ còn lại bắt đầu bằng /kl/.') },
     3: { vocabulary: [v('melody', '/ˈmelədi/', 'giai điệu', 'I remember the song’s melody.'), v('perform', '/pəˈfɔːm/', 'biểu diễn', 'The band will perform tonight.'), v('audience', '/ˈɔːdiəns/', 'khán giả', 'The audience applauded loudly.'), v('talent', '/ˈtælənt/', 'tài năng', 'The contest highlights young talent.')], pronunciation: p('Trọng âm từ hai âm tiết', 'Nhiều danh từ hai âm tiết nhấn âm đầu, nhiều động từ nhấn âm sau; đây là xu hướng, không phải quy tắc tuyệt đối.', 'music /ˈmjuːzɪk/ · singer /ˈsɪŋə(r)/ · perform /pəˈfɔːm/', ['music', 'singer', 'concert', 'perform'], undefined, 3, '“Perform” nhấn âm tiết thứ hai; ba danh từ còn lại nhấn âm đầu.', 'Which word has a different stress pattern?') },
     4: { vocabulary: [v('volunteer', '/ˌvɒlənˈtɪə(r)/', 'tình nguyện viên', 'A volunteer helped at the library.'), v('donate', '/dəʊˈneɪt/', 'quyên góp', 'We donate books to the centre.'), v('charity', '/ˈtʃærəti/', 'tổ chức hoặc hoạt động từ thiện', 'The charity supports local children.'), v('benefit', '/ˈbenɪfɪt/', 'lợi ích', 'The project brings a benefit to everyone.')], pronunciation: p('Trọng âm ở từ hai âm tiết cùng cách viết', 'Một số từ đổi trọng âm theo loại từ: danh từ RECORD nhấn âm đầu; động từ reCORD nhấn âm sau.', 'a record /ˈrekɔːd/ · to record /rɪˈkɔːd/', ['record (noun)', 'present (noun)', 'export (noun)', 'record (verb)'], undefined, 3, '“Record” là động từ nhấn âm tiết thứ hai; ba danh từ còn lại nhấn âm đầu.', 'Which option is stressed on the second syllable?') },
@@ -50,9 +95,17 @@ export const unitEnrichment: Record<8 | 9 | 10, Record<number, UnitEnrichment>> 
   },
 };
 
+export const unitEnrichment: Record<8 | 9 | 10 | ExtendedGrade, Record<number, UnitEnrichment>> = {
+  6: extendedEnrichment[6],
+  7: extendedEnrichment[7],
+  ...coreUnitEnrichment,
+  11: extendedEnrichment[11],
+  12: extendedEnrichment[12],
+};
+
 export function enrichUnitExam(exam: Exam, grade: 8 | 9 | 10): Exam {
-  if (exam.menuGroup !== 'unit') return exam;
-  const unit = grade === 8 ? exam.id - 6 : grade === 9 ? exam.id - 100 : exam.id;
+  if (exam.menuGroup !== 'unit' || exam.skipEnrichment) return exam;
+  const unit = exam.unit ?? (grade === 8 ? exam.id - 6 : grade === 9 ? exam.id - 100 : exam.id);
   const enrichment = unitEnrichment[grade][unit];
   if (!enrichment) return exam;
 

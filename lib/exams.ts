@@ -1,6 +1,7 @@
 export type Question = {
   id: number;
-  section: 'Language Focus' | 'Reading';
+  section: 'Language Focus' | 'Reading' | 'Writing';
+  skillArea?: 'Pronunciation' | 'Vocabulary' | 'Grammar' | 'Reading' | 'Writing' | 'Looking Back';
   prompt: string;
   options: string[];
   answer: number | string | string[];
@@ -21,6 +22,9 @@ export type Question = {
 
 export type Exam = {
   id: number;
+  unit?: number;
+  bookLabel?: 'Bộ cũ' | 'Bộ mới';
+  skipEnrichment?: boolean;
   menuLabel?: string;
   menuGroup?: 'review' | 'survey' | 'midterm' | 'final' | 'midterm2' | 'final2' | 'unit';
   title: string;
