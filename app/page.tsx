@@ -33,7 +33,7 @@ type AidKind = 'cotton' | 'medicine' | 'injection';
 type AidInventory = Record<AidKind, number>;
 type ChickenSpawn = { id: number; x: number; y: number; size: number; rotate: number; delay: number };
 
-const STARTER_AID: AidInventory = { cotton: 2, medicine: 1, injection: 1 };
+const STARTER_AID: AidInventory = { cotton: 0, medicine: 0, injection: 0 };
 const AID_ITEMS: { kind: AidKind; name: string; icon: string; heal: number; color: string }[] = [
   { kind: 'cotton', name: 'Bông băng', icon: '🩹', heal: 1, color: 'border-sky-200 bg-sky-50 text-sky-900' },
   { kind: 'medicine', name: 'Thuốc hồi phục', icon: '💊', heal: 2, color: 'border-emerald-200 bg-emerald-50 text-emerald-900' },
@@ -47,7 +47,25 @@ const COMMANDO_RANKS = [
   { streak: Number.POSITIVE_INFINITY, name: 'Vịt Commando' },
 ];
 const SURVIVAL_STAGES = ['Đi bộ', 'Xe đạp', 'Xe máy', 'Xe Jeep', 'Xe tăng', 'Máy bay chiến đấu'] as const;
+const SURVIVAL_VEHICLES = [
+  'survival-walk-v2.png',
+  'survival-bike-v2.png',
+  'survival-scooter-v2.png',
+  'survival-jeep-v2.png',
+  'survival-tank-v2.png',
+  'survival-jet-v2.png',
+] as const;
 const SURVIVAL_TARGET = 10;
+
+function rollAidDrop(totalCorrect: number): AidKind {
+  if (totalCorrect >= 20) {
+    const roll = Math.random();
+    if (roll < 0.2) return 'injection';
+    if (roll < 0.55) return 'medicine';
+  }
+  if (totalCorrect >= 10 && Math.random() < 0.35) return 'medicine';
+  return 'cotton';
+}
 
 function unitNumber(exam: Exam, grade: GradeLevel) {
   if (exam.unit) return exam.unit;
@@ -142,6 +160,8 @@ export default function Home() {
   const [lockSeconds, setLockSeconds] = useState(0);
   const [aidInventory, setAidInventory] = useState<AidInventory>(STARTER_AID);
   const [aidOpen, setAidOpen] = useState(false);
+  const [practiceCorrectCount, setPracticeCorrectCount] = useState(0);
+  const [aidDropNotice, setAidDropNotice] = useState<AidKind | null>(null);
   const [hitPulse, setHitPulse] = useState(0);
   const [survivalStage, setSurvivalStage] = useState(0);
   const [stageCorrect, setStageCorrect] = useState(0);
@@ -175,6 +195,7 @@ export default function Home() {
   const vehicleIndex = Math.min(survivalStage % 7, SURVIVAL_STAGES.length - 1);
   const stageName = isBossStage ? 'Màn Boss Gà Khổng Lồ' : SURVIVAL_STAGES[vehicleIndex];
   const survivalGameOver = mode === 'survival' && survivalEnded;
+  const nextAidMilestone = Math.max(5, Math.ceil((practiceCorrectCount + 1) / 5) * 5);
 
   useEffect(() => {
     if ((mode !== 'test' && mode !== 'survival') || submitted || survivalEnded || secondsLeft <= 0) return;
@@ -194,6 +215,12 @@ export default function Home() {
     const timer = window.setTimeout(() => setStageUpNotice(null), 1800);
     return () => window.clearTimeout(timer);
   }, [stageUpNotice]);
+
+  useEffect(() => {
+    if (!aidDropNotice) return;
+    const timer = window.setTimeout(() => setAidDropNotice(null), 2400);
+    return () => window.clearTimeout(timer);
+  }, [aidDropNotice]);
 
   useEffect(() => {
     if (lockSeconds <= 0) return;
@@ -223,6 +250,8 @@ export default function Home() {
     setLockSeconds(0);
     setAidInventory(STARTER_AID);
     setAidOpen(false);
+    setPracticeCorrectCount(0);
+    setAidDropNotice(null);
     setHitPulse(0);
     setSurvivalStage(0);
     setStageCorrect(0);
@@ -251,6 +280,8 @@ export default function Home() {
     setLockSeconds(0);
     setAidInventory(STARTER_AID);
     setAidOpen(false);
+    setPracticeCorrectCount(0);
+    setAidDropNotice(null);
     setHitPulse(0);
     setSurvivalStage(0);
     setStageCorrect(0);
@@ -278,6 +309,8 @@ export default function Home() {
     setLockSeconds(0);
     setAidInventory(STARTER_AID);
     setAidOpen(false);
+    setPracticeCorrectCount(0);
+    setAidDropNotice(null);
     setHitPulse(0);
     setSurvivalStage(0);
     setStageCorrect(0);
@@ -293,7 +326,18 @@ export default function Home() {
       setBestStreak((best) => Math.max(best, next));
       return next;
     });
-  }, []);
+    if (mode === 'practice') {
+      setPracticeCorrectCount((current) => {
+        const next = current + 1;
+        if (next >= 5 && next % 5 === 0) {
+          const dropped = rollAidDrop(next);
+          setAidInventory((inventory) => ({ ...inventory, [dropped]: inventory[dropped] + 1 }));
+          setAidDropNotice(dropped);
+        }
+        return next;
+      });
+    }
+  }, [mode]);
 
   const recordWrong = useCallback((questionId: number) => {
     const attempt = (wrongAttempts[questionId] ?? 0) + 1;
@@ -634,13 +678,13 @@ export default function Home() {
         </section>
 
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-          {mode === 'survival' ? <div className={`overflow-hidden rounded-3xl p-5 text-white shadow-lg ${isBossStage ? 'bg-gradient-to-br from-rose-800 to-slate-950' : 'bg-gradient-to-br from-amber-500 to-orange-700'}`}>
+          {mode === 'survival' ? <div className={`overflow-hidden rounded-3xl p-5 text-white shadow-lg ${isBossStage ? 'bg-gradient-to-br from-rose-800 to-slate-950' : 'bg-gradient-to-br from-sky-600 via-cyan-700 to-slate-900'}`}>
             <div className="flex items-center justify-between"><span className="font-black uppercase tracking-wider">Survival · Màn {survivalStage + 1}</span><Clock3 className="size-5 text-white"/></div>
             <strong suppressHydrationWarning className="mt-2 block font-mono text-4xl tracking-tight">{formatTime(secondsLeft)}</strong>
             <div className="mt-3 rounded-2xl bg-white/15 p-3">
               {isBossStage
                 ? <img src="chicken-boss.png" alt="Gà Boss" className="mx-auto h-28 w-28 object-contain" style={{ transform: `scale(${1 + stageCorrect * 0.035 + (3 - survivalLives) * 0.08})` }}/>
-                : <div aria-label={`Phương tiện: ${stageName}`} className="mx-auto h-24 w-36 bg-no-repeat" style={{ backgroundImage: 'url(survival-vehicles.png)', backgroundSize: '600% 100%', backgroundPosition: `${vehicleIndex * 20}% center` }}/>
+                : <img src={SURVIVAL_VEHICLES[vehicleIndex]} alt={`Phương tiện: ${stageName}`} className="mx-auto h-28 w-full object-contain drop-shadow-xl"/>
               }
               <p className="mt-1 text-center font-black">{stageName}</p>
             </div>
@@ -654,7 +698,7 @@ export default function Home() {
               {rankIndex >= 0 ? <div aria-label={`Avatar ${rankName}`} className="h-24 w-[72px] bg-contain bg-no-repeat" style={{ backgroundImage: 'url(duck-commando-ranks.png)', backgroundSize: '500% 100%', backgroundPosition: `${rankIndex * 25}% center` }} /> : <img src="duck-learn.png" alt="Vịt Tân Binh" className="h-20 w-20 rounded-2xl object-cover" />}
               <div><p className="text-xs font-bold uppercase tracking-wider text-amber-700">{rankName}</p><strong className="mt-1 block text-lg text-slate-900">Chuỗi đúng: {correctStreak}</strong><p className="text-xs text-slate-500">Kỷ lục: {bestStreak} · Mốc tiếp: {correctStreak < 10 ? 10 : correctStreak < 20 ? 20 : correctStreak < 30 ? 30 : correctStreak < 40 ? 40 : '100%'}</p></div>
             </div>
-            <div className="border-t border-rose-100 bg-rose-50 p-4"><div className="flex items-center justify-between text-sm"><strong className="text-rose-900">Máu còn lại</strong><span className="font-bold text-rose-700">{Math.max(0, maxDamage - damage)}/{maxDamage}</span></div><div className="mt-2 h-2.5 overflow-hidden rounded-full bg-rose-200"><div className="h-full bg-rose-500 transition-all" style={{ width: `${100 - damagePercent}%` }} /></div><Button onClick={() => setAidOpen(true)} disabled={damage === 0 || gameOver} className="mt-3 w-full bg-emerald-600 font-bold hover:bg-emerald-700">🧰 Mở tủ cấp cứu</Button></div>
+            <div className="border-t border-rose-100 bg-rose-50 p-4"><div className="flex items-center justify-between text-sm"><strong className="text-rose-900">Máu còn lại</strong><span className="font-bold text-rose-700">{Math.max(0, maxDamage - damage)}/{maxDamage}</span></div><div className="mt-2 h-2.5 overflow-hidden rounded-full bg-rose-200"><div className="h-full bg-rose-500 transition-all" style={{ width: `${100 - damagePercent}%` }} /></div><div className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-xs leading-5 text-slate-600"><strong className="text-emerald-800">Kho: 🩹 {aidInventory.cotton} · 💊 {aidInventory.medicine} · 💉 {aidInventory.injection}</strong><br/>Mỗi 5 câu đúng nhận 1 vật phẩm. Mốc tiếp theo: {nextAidMilestone} câu.</div><Button onClick={() => setAidOpen(true)} disabled={damage === 0 || gameOver || Object.values(aidInventory).every((count) => count === 0)} className="mt-3 w-full bg-emerald-600 font-bold hover:bg-emerald-700">🧰 Mở tủ cấp cứu</Button></div>
           </div>}
           <div className="rounded-3xl border border-sky-100 bg-white p-4 shadow-sm"><p className="mb-3 text-sm font-bold">Danh sách câu</p><div className="grid grid-cols-5 gap-2">{questions.map((item, index) => { const done = isAnswerComplete(item, answers[item.id]); const marked = flagged.includes(item.id); return <button aria-label={`Mở câu ${index + 1}`} key={item.id} onClick={() => setQuestionIndex(index)} className={`relative aspect-square rounded-xl text-sm font-bold transition ${questionIndex === index && !submitted ? 'ring-2 ring-sky-700 ring-offset-2' : ''} ${marked ? 'bg-indigo-400 text-white' : done ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-sky-100'}`}>{index + 1}</button>})}</div><div className="mt-4 grid gap-2 text-xs text-slate-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-sky-500"/>Câu đã làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-200"/>Câu chưa làm</span><span><i className="mr-2 inline-block h-3 w-3 rounded-full bg-indigo-400"/>Đã đánh dấu để xem lại</span></div></div>
           <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Sparkles className="size-5 text-amber-600"/><strong className="text-amber-950">Từ vựng của Vịt</strong></div><button onClick={() => setVocabulary(randomVocabulary(grade))} className="rounded-full p-2 text-amber-700 transition hover:bg-amber-100" aria-label="Đổi ba từ vựng"><RefreshCw className="size-4"/></button></div><div className="mt-3 grid gap-3">{vocabulary.map((item) => <div key={item.word} className="rounded-2xl bg-white p-3 shadow-sm"><strong className="text-sky-800">{item.word}</strong><span className="ml-2 text-sm text-amber-800">{item.meaning}</span><p className="mt-1 text-sm leading-5 text-slate-600">{item.example}</p></div>)}</div></div>
@@ -666,9 +710,10 @@ export default function Home() {
       {mode === 'survival' && chickenSpawns.length > 0 && <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[58] overflow-hidden bg-amber-950/10">{chickenSpawns.map((chicken) => <img key={chicken.id} src="chicken-army.png" alt="" className="chicken-invade absolute object-contain drop-shadow-2xl" style={{ left: `${chicken.x}%`, top: `${chicken.y}%`, width: chicken.size, height: chicken.size, rotate: `${chicken.rotate}deg`, animationDelay: `${chicken.delay}s` }}/>)}</div>}
       {mode === 'survival' && isBossStage && !survivalEnded && <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[57] grid place-items-center overflow-hidden"><img src="chicken-boss.png" alt="" className="max-h-[82vh] max-w-[82vw] object-contain opacity-25 drop-shadow-2xl transition-transform duration-700" style={{ transform: `scale(${0.7 + stageCorrect * 0.055 + (3 - survivalLives) * 0.12})` }}/></div>}
       {mode === 'survival' && stageUpNotice && <div role="status" className="pointer-events-none fixed inset-0 z-[90] grid place-items-center bg-sky-950/35 p-4"><div className="rounded-[28px] border-4 border-amber-300 bg-slate-950/95 px-8 py-7 text-center text-white shadow-2xl"><p className="text-sm font-black uppercase tracking-[.22em] text-amber-300">Qua màn!</p><p className="mt-2 text-3xl font-black">{stageUpNotice}</p></div></div>}
+      {mode === 'practice' && aidDropNotice && <div role="status" className="pointer-events-none fixed inset-x-0 top-24 z-[92] flex justify-center px-4"><div className="rounded-2xl border-2 border-emerald-300 bg-slate-950/95 px-5 py-4 text-center text-white shadow-2xl"><p className="text-xs font-black uppercase tracking-[.2em] text-emerald-300">Túi cứu thương</p><p className="mt-1 text-lg font-black">Nhận {AID_ITEMS.find((item) => item.kind === aidDropNotice)?.icon} {AID_ITEMS.find((item) => item.kind === aidDropNotice)?.name}</p></div></div>}
       {(mode === 'practice' || mode === 'survival') && hitPulse > 0 && <div key={hitPulse} aria-hidden="true" className="hit-flash pointer-events-none fixed inset-0 z-[65] grid place-items-center bg-rose-700/35"><div className="h-32 w-32 rounded-full border-[14px] border-white/55 shadow-[0_0_80px_32px_rgba(225,29,72,.75)]" /></div>}
       {hintOpen && !gameOver && lockedQuestion === question.id && <dialog open className="fixed inset-0 z-[70] m-0 grid h-screen w-screen max-w-none place-items-center bg-slate-950/45 p-4" aria-labelledby="hint-title"><div className="w-full max-w-lg rounded-[28px] border border-amber-200 bg-white p-6 shadow-2xl"><div className="flex items-center gap-3"><img src="duck-learn.png" alt="Mascot vịt đưa gợi ý" className="h-16 w-16 rounded-2xl object-cover"/><div><p className="text-sm font-bold uppercase tracking-wider text-amber-700">Sai lần {wrongAttempts[question.id] ?? 1}</p><h2 id="hint-title" className="text-xl font-extrabold text-slate-900">Chưa đúng — xem gợi ý nhé</h2></div></div><p className="mt-4 rounded-2xl bg-amber-50 p-4 leading-7 text-slate-700">{question.hint ?? 'Read the instruction carefully. Check the tense marker, word form, sentence structure, or the exact evidence in the passage before trying again.'}</p><p className="mt-3 text-sm text-slate-500">Đáp án chưa được tiết lộ. Câu trả lời sẽ được xóa để em làm lại. {lockSeconds > 0 ? `Hệ thống đang khóa câu trong ${lockSeconds} giây.` : ''}</p><Button onClick={retryAfterHint} disabled={lockSeconds > 0} autoFocus className="mt-5 w-full rounded-xl bg-amber-500 font-bold text-white hover:bg-amber-600 disabled:bg-slate-400">{lockSeconds > 0 ? `🔒 Chờ ${lockSeconds}s` : 'Đã hiểu · Làm lại'}</Button></div></dialog>}
-      {aidOpen && !gameOver && <dialog open className="fixed inset-0 z-[80] m-0 grid h-screen w-screen max-w-none place-items-center bg-emerald-950/55 p-4" aria-labelledby="aid-title"><div className="w-full max-w-xl rounded-[28px] border-4 border-emerald-400 bg-slate-950 p-6 text-white shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-[.18em] text-emerald-300">Medical crate</p><h2 id="aid-title" className="text-2xl font-black">🧰 Tủ cấp cứu</h2><p className="mt-1 text-sm text-slate-300">Chọn một vật phẩm để xóa vết thương. Vật phẩm đã dùng sẽ mất khỏi kho.</p></div><button onClick={() => setAidOpen(false)} className="rounded-full bg-white/10 p-2 hover:bg-white/20" aria-label="Đóng tủ cấp cứu"><X className="size-5"/></button></div><div className="mt-5 grid gap-3 sm:grid-cols-3">{AID_ITEMS.map((item) => <button key={item.kind} onClick={() => useAid(item.kind)} disabled={aidInventory[item.kind] <= 0 || damage <= 0} className={`rounded-2xl border-2 p-4 text-left transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-35 ${item.color}`}><span className="text-4xl">{item.icon}</span><strong className="mt-2 block">{item.name}</strong><span className="text-sm">Hồi {item.heal} máu · Còn {aidInventory[item.kind]}</span></button>)}</div><div className="mt-5 rounded-2xl bg-white/10 p-4"><div className="flex justify-between text-sm"><span>Mức thương tích</span><strong>{damage}/{maxDamage}</strong></div><div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-700"><div className="h-full bg-rose-500" style={{ width: `${damagePercent}%` }}/></div></div></div></dialog>}
+      {aidOpen && !gameOver && <dialog open className="fixed inset-0 z-[80] m-0 grid h-screen w-screen max-w-none place-items-center bg-emerald-950/55 p-4" aria-labelledby="aid-title"><div className="w-full max-w-xl rounded-[28px] border-4 border-emerald-400 bg-slate-950 p-6 text-white shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-[.18em] text-emerald-300">Medical crate</p><h2 id="aid-title" className="text-2xl font-black">🧰 Tủ cấp cứu</h2><p className="mt-1 text-sm text-slate-300">Cứ 5 câu đúng sẽ rơi một vật phẩm: từ 5 câu có bông băng; từ 10 câu có thể ra thuốc cấp 2; từ 20 câu có thể ra ống tiêm cấp 3. Chọn một món để hồi máu.</p></div><button onClick={() => setAidOpen(false)} className="rounded-full bg-white/10 p-2 hover:bg-white/20" aria-label="Đóng tủ cấp cứu"><X className="size-5"/></button></div><div className="mt-5 grid gap-3 sm:grid-cols-3">{AID_ITEMS.map((item) => <button key={item.kind} onClick={() => useAid(item.kind)} disabled={aidInventory[item.kind] <= 0 || damage <= 0} className={`rounded-2xl border-2 p-4 text-left transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-35 ${item.color}`}><span className="text-4xl">{item.icon}</span><strong className="mt-2 block">{item.name}</strong><span className="text-sm">Hồi {item.heal} máu · Còn {aidInventory[item.kind]}</span></button>)}</div><div className="mt-5 rounded-2xl bg-white/10 p-4"><div className="flex justify-between text-sm"><span>Mức thương tích</span><strong>{damage}/{maxDamage}</strong></div><div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-700"><div className="h-full bg-rose-500" style={{ width: `${damagePercent}%` }}/></div></div></div></dialog>}
       {gameOver && <dialog open className="fixed inset-0 z-[100] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/90 p-4" aria-labelledby="game-over-title"><div className="w-full max-w-md rounded-[28px] border-2 border-rose-500 bg-slate-900 p-6 text-center text-white shadow-2xl"><img src="duck-hospital.png" alt="Vịt băng bó đang hồi phục trong bệnh viện" className="mx-auto h-48 w-48 object-contain drop-shadow-2xl"/><p className="mt-2 text-sm font-bold uppercase tracking-[.22em] text-rose-300">Vịt cần hồi phục</p><h2 id="game-over-title" className="mt-2 text-3xl font-black">Màn hình đã bị che hoàn toàn</h2><p className="mt-3 leading-7 text-slate-300">Số lần sai đã đạt 20% số câu của bài. Vịt đã được băng bó an toàn; em cần làm lại từ đầu và dùng tủ cấp cứu sớm hơn ở lượt tới.</p><Button onClick={resetExam} autoFocus className="mt-5 w-full bg-rose-600 py-6 text-base font-black hover:bg-rose-700"><RotateCcw/> Làm lại từ đầu</Button></div></dialog>}
       {survivalGameOver && <dialog open className="fixed inset-0 z-[110] m-0 grid h-screen w-screen max-w-none place-items-center overflow-y-auto bg-slate-950/90 p-4" aria-labelledby="survival-over-title"><div className="w-full max-w-lg rounded-[30px] border-2 border-amber-400 bg-slate-900 p-6 text-center text-white shadow-2xl"><div className="grid grid-cols-2 items-end gap-2"><img src="duck-hospital.png" alt="Vịt đang hồi phục" className="h-44 w-full object-contain"/><img src={isBossStage ? 'chicken-boss.png' : 'chicken-army.png'} alt={isBossStage ? 'Gà Boss' : 'Quân đội gà'} className="h-44 w-full object-contain"/></div><p className="mt-2 text-sm font-bold uppercase tracking-[.22em] text-amber-300">Survival kết thúc</p><h2 id="survival-over-title" className="mt-2 text-3xl font-black">{survivalReason === 'time' ? 'Hết thời gian!' : 'Vịt đã hết máu!'}</h2><p className="mt-3 leading-7 text-slate-300">Bạn đã tới màn {survivalStage + 1} · {stageName}, đạt chuỗi cao nhất {bestStreak}. Bắt đầu lại với 02:00 và 5 máu nhé.</p><Button onClick={resetExam} autoFocus className="mt-5 w-full bg-amber-500 py-6 text-base font-black text-slate-950 hover:bg-amber-400"><RotateCcw/> Chơi Survival lại</Button></div></dialog>}
       {dictionary && <div role="dialog" aria-live="polite" onClick={(event) => event.stopPropagation()} className="fixed z-50 w-72 rounded-2xl border border-sky-200 bg-white p-4 shadow-2xl" style={{ left: Math.max(12, dictionary.x), top: Math.max(12, dictionary.y) }}><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2 text-sky-800"><Languages className="size-5"/><strong>Từ điển Anh–Việt</strong></div><button onClick={() => setDictionary(null)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100" aria-label="Đóng từ điển"><X className="size-4"/></button></div>{dictionary.word && <p className="mt-3 break-words text-base font-bold text-slate-900">{dictionary.word}</p>}<p className={`mt-1 break-words text-sm leading-6 ${dictionary.status === 'error' ? 'text-rose-700' : 'text-slate-700'}`}>{dictionary.translation}</p>{dictionary.status === 'ready' && <p className="mt-2 text-[11px] text-slate-400">Bản dịch tự động · MyMemory</p>}</div>}
