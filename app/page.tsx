@@ -186,6 +186,12 @@ function isLookingBackVocabularyQuestion(question: Question) {
   return question.skillArea === 'Looking Back' && /means?|meaning|key words?|vocabulary|unit word|best word|correct word/i.test(`${question.prompt} ${question.template ?? ''} ${question.explanation}`);
 }
 
+function isDirectVocabularyMeaningQuestion(question: Question) {
+  const text = `${question.prompt} ${question.template ?? ''}`;
+  if (/which (?:word|phrase|unit \d+ word).*means|which definition.*(?:matches|best matches)/i.test(text)) return true;
+  return (question.skillArea === 'Vocabulary' || question.skillArea === 'Looking Back') && /what does .* mean|what is the meaning|means [“"']|definition of/i.test(text);
+}
+
 function capMultipleChoiceOptions(question: Question): Question {
   if (question.kind === 'typed' || question.kind === 'cloze-dropdown' || question.options.length <= 4 || typeof question.answer !== 'number') return question;
   const correctOption = question.options[question.answer];
@@ -202,6 +208,7 @@ function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, ta
     passageTitle: question.section === 'Reading' ? source.passageTitle : undefined,
     sourceIndex,
   }))).filter((question) => !(excludeTypedVocabulary && isTypedVocabularyQuestion(question)))
+    .filter((question) => !isDirectVocabularyMeaningQuestion(question))
     .filter((question) => !(selectionOnly && (question.kind === 'typed' || question.kind === 'cloze-dropdown' || question.options.length < 2)))
     .filter((question) => !(excludeLookingBack && question.skillArea === 'Looking Back'))
     .filter((question) => !(isLookingBackVocabularyQuestion(question) && !reviewedVocabularyExamIds.has(allExams[question.sourceIndex].id)));
