@@ -154,6 +154,42 @@ body {
   animation: chicken-invade 520ms cubic-bezier(.2,.9,.25,1.25) both;
 }
 
+@keyframes glass-crack {
+  0% { opacity: 0; transform: scale(1.55); }
+  55% { opacity: 1; transform: scale(.94); }
+  100% { opacity: .96; transform: scale(1); }
+}
+
+.glass-crack { animation: glass-crack 380ms cubic-bezier(.2,.9,.25,1.2) both; }
+
+@keyframes food-drop {
+  0% { opacity: 0; transform: translateY(-45px) scale(.4) rotate(-18deg); }
+  25% { opacity: 1; transform: translateY(0) scale(1.12) rotate(7deg); }
+  82% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translateY(16px) scale(.8); }
+}
+.food-drop { animation: food-drop 3s ease-in-out both; }
+
+@keyframes screen-blur {
+  0%, 100% { opacity: 0; }
+  12%, 86% { opacity: 1; }
+}
+.screen-blur { animation: screen-blur 4s ease-in-out both; }
+
+@keyframes agent-pop {
+  0% { opacity: 0; transform: scale(.55) translateY(40px); }
+  18%, 82% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(1.08) translateY(-20px); }
+}
+.agent-pop { animation: agent-pop 3s ease-in-out both; }
+
+@keyframes trex-pop {
+  0% { opacity: 0; transform: translateX(90px) rotate(8deg) scale(.5); }
+  55% { opacity: 1; transform: translateX(0) rotate(-5deg) scale(1.08); }
+  100% { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+}
+.trex-pop { animation: trex-pop 520ms cubic-bezier(.2,.9,.25,1.2) both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .hit-flash, .chicken-invade { animation-duration: 1ms; }
+  .hit-flash, .chicken-invade, .glass-crack, .food-drop, .screen-blur, .agent-pop, .trex-pop { animation-duration: 1ms; }
 }

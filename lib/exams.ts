@@ -18,6 +18,9 @@ export type Question = {
   hint?: string;
   underlines?: string[];
   origin?: 'unit-enrichment';
+  /** Source reading text retained when questions are mixed across tests. */
+  passage?: string;
+  passageTitle?: string;
 };
 
 export type Exam = {
