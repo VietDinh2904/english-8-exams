@@ -251,10 +251,7 @@ function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, ta
     group.push(item); readingGroups.set(key, group);
   }
   const allReadingGroups = [...readingGroups.values()];
-  const orderedGroups = [
-    ...shuffled(allReadingGroups.filter((group) => group.some((item) => !seenBefore.has(questionKey(item))))),
-    ...shuffled(allReadingGroups.filter((group) => group.every((item) => seenBefore.has(questionKey(item))))),
-  ];
+  const orderedGroups = allReadingGroups;
   let readingCount = 0;
   for (const group of orderedGroups) {
     if (readingCount >= readingTarget) break;
@@ -280,7 +277,10 @@ function buildMixedQuestions(exam: Exam, allExams: Exam[], examIndex: number, ta
     const pinned = pool.find((item) => questionKey(item) === pinnedKey);
     if (pinned) arranged = [pinned, ...arranged.filter((item) => questionKey(item) !== pinnedKey)].slice(0, targetCount);
   }
-  return distributeAnswers(arranged.map((item, index) => ({ ...item, id: index + 1 })), `mixed|${examIndex}|${targetCount}|${Date.now()}`).map(capMultipleChoiceOptions);
+  const indexed = arranged.map((item, index) => ({ ...item, id: index + 1 }));
+  const randomizedNonReading = distributeAnswers(indexed.filter((item) => item.section !== 'Reading'), `mixed|${examIndex}|${targetCount}|${Date.now()}`);
+  const randomizedById = new Map(randomizedNonReading.map((item) => [item.id, item]));
+  return indexed.map((item) => capMultipleChoiceOptions(item.section === 'Reading' ? item : randomizedById.get(item.id) ?? item));
 }
 
 function randomVocabulary(grade: GradeLevel): VocabularyItem[] {
@@ -292,6 +292,37 @@ function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
   const secs = (seconds % 60).toString().padStart(2, '0');
   return `${mins}:${secs}`;
+}
+
+function practiceHint(question: Question) {
+  if (question.hint) return question.hint;
+  if (question.section === 'Reading') return 'Đọc lại đoạn văn và tìm câu chứa cùng từ khóa hoặc ý được diễn đạt tương đương với câu hỏi.';
+  if (question.section === 'Writing') return 'Xác định chủ ngữ, động từ, trật tự từ và cấu trúc bắt buộc trước khi viết câu hoàn chỉnh.';
+  if (question.skillArea === 'Pronunciation') return 'Đọc chậm từng từ, chú ý phần được gạch dưới và so sánh âm hoặc trọng âm.';
+  if (question.skillArea === 'Vocabulary' || question.skillArea === 'Looking Back') return 'Dựa vào những từ đứng trước và sau chỗ trống để xác định nghĩa và từ loại cần dùng.';
+  return 'Tìm dấu hiệu thì, từ loại, chủ ngữ và cấu trúc ngữ pháp chính trước khi chọn đáp án.';
+}
+
+function buildQuestionPages(questions: Question[], pageSize = 10) {
+  const pages: number[][] = [];
+  let page: number[] = [];
+  let index = 0;
+  const flush = () => { if (page.length) pages.push(page); page = []; };
+  while (index < questions.length) {
+    if (questions[index].section === 'Reading') {
+      const passageKey = `${questions[index].passageTitle ?? ''}|${questions[index].passage ?? ''}`;
+      const group: number[] = [];
+      while (index < questions.length && questions[index].section === 'Reading' && `${questions[index].passageTitle ?? ''}|${questions[index].passage ?? ''}` === passageKey) group.push(index++);
+      if (page.length && page.length + group.length > pageSize) flush();
+      page.push(...group);
+      if (page.length >= pageSize) flush();
+      continue;
+    }
+    page.push(index++);
+    if (page.length >= pageSize) flush();
+  }
+  flush();
+  return pages;
 }
 
 function readSeenQuestions() {
@@ -354,6 +385,7 @@ export default function Home() {
   const [ownedLoadout, setOwnedLoadout] = useState<string[]>([]);
   const [equippedLoadout, setEquippedLoadout] = useState<Loadout>(STARTER_LOADOUT);
   const [reviewedVocabularyKeys, setReviewedVocabularyKeys] = useState<string[]>([]);
+  const [visibleHints, setVisibleHints] = useState<Record<string, boolean>>({});
   const availableExams = examsByGrade[grade];
   const exam = availableExams[examIndex];
   const selectedUnit = unitNumber(exam, grade);
@@ -365,6 +397,9 @@ export default function Home() {
   const reviewedVocabularyExamIds = useMemo(() => new Set(availableExams.filter((item) => reviewedVocabularyKeys.includes(`${grade}-${item.id}`)).map((item) => item.id)), [availableExams, grade, reviewedVocabularyKeys]);
   const questions = useMemo(() => buildMixedQuestions(exam, availableExams, examIndex, mode === 'practice' ? exam.questions.length : 40, seenAtSelection, focusQuestionKey, mode === 'test', mode === 'survival', reviewedVocabularyExamIds, mode === 'test'), [availableExams, exam, examIndex, focusQuestionKey, mode, reviewedVocabularyExamIds, seenAtSelection]);
   const question = questions[questionIndex];
+  const questionPages = useMemo(() => buildQuestionPages(questions), [questions]);
+  const currentPageIndex = mode === 'survival' ? 0 : Math.max(0, questionPages.findIndex((page) => page.includes(questionIndex)));
+  const visibleQuestionIndexes = mode === 'survival' ? [questionIndex] : questionPages[currentPageIndex] ?? [];
   const selected = drafts[question.id] ?? answers[question.id];
   const displayQuestion = useMemo<Question>(() => bossPenalty?.kind === 'extra-options' && mode === 'survival' && survivalStage % 7 === 6 && question.kind !== 'typed' && question.kind !== 'cloze-dropdown' && question.options.length === 4
     ? { ...question, options: [...question.options, 'Both A and B', 'Not enough information'] }
@@ -541,6 +576,7 @@ export default function Home() {
     setScreenBlurred(false);
     setAgentNotice(false);
     setVocabHintSteps({});
+    setVisibleHints({});
     setBossPenalty(null);
   }, [mode]);
 
@@ -580,6 +616,7 @@ export default function Home() {
     setScreenBlurred(false);
     setAgentNotice(false);
     setVocabHintSteps({});
+    setVisibleHints({});
     setBossPenalty(null);
   };
 
@@ -618,6 +655,7 @@ export default function Home() {
     setScreenBlurred(false);
     setAgentNotice(false);
     setVocabHintSteps({});
+    setVisibleHints({});
     setBossPenalty(null);
   };
 
@@ -805,8 +843,8 @@ export default function Home() {
     advanceSurvivalQuestion();
   }, [advanceSurvivalQuestion, exam.id, exam.title, grade, isBossStage, questionIndex, questions, triggerBossPenalty]);
 
-  const chooseAnswer = useCallback((value: AnswerValue) => {
-    const currentQuestion = questions[questionIndex];
+  const chooseAnswer = useCallback((value: AnswerValue, targetIndex = questionIndex) => {
+    const currentQuestion = questions[targetIndex];
     if (gameOver || survivalGameOver || lockedQuestion === currentQuestion.id || (mode === 'practice' && answers[currentQuestion.id] !== undefined)) return;
     if (mode === 'test') {
       setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
@@ -826,12 +864,13 @@ export default function Home() {
       setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
       recordCorrect();
     } else {
+      setQuestionIndex(targetIndex);
       recordWrong(currentQuestion);
     }
   }, [answers, gameOver, lockedQuestion, mode, questionIndex, questions, recordCorrect, recordSurvivalCorrect, recordSurvivalWrong, recordWrong, survivalGameOver]);
 
-  const checkTypedAnswer = useCallback(() => {
-    const currentQuestion = questions[questionIndex];
+  const checkTypedAnswer = useCallback((targetIndex = questionIndex) => {
+    const currentQuestion = questions[targetIndex];
     const value = drafts[currentQuestion.id];
     if (gameOver || survivalGameOver || !isAnswerComplete(currentQuestion, value)) return;
     if (mode === 'survival') {
@@ -843,6 +882,7 @@ export default function Home() {
       setAnswers((current) => ({ ...current, [currentQuestion.id]: value }));
       if (mode === 'practice') recordCorrect();
     } else {
+      setQuestionIndex(targetIndex);
       recordWrong(currentQuestion);
     }
   }, [drafts, gameOver, mode, questionIndex, questions, recordCorrect, recordSurvivalCorrect, recordSurvivalWrong, recordWrong, survivalGameOver]);
@@ -882,27 +922,41 @@ export default function Home() {
     setSubmitted(true);
   };
 
-  const openDictionary = async (event: ReactMouseEvent<HTMLElement>) => {
-    if (mode !== 'practice') return;
-    event.preventDefault();
-    const selectedText = window.getSelection()?.toString().trim().replace(/\s+/g, ' ') ?? '';
-    const x = Math.min(event.clientX, window.innerWidth - 300);
-    const y = Math.min(event.clientY, window.innerHeight - 190);
+  const lookupDictionary = useCallback(async (selectedText: string, x: number, y: number) => {
     if (!selectedText || selectedText.length > 120 || !/[a-zA-Z]/.test(selectedText)) {
-      setDictionary({ word: '', translation: 'Hãy bôi đen một từ hoặc cụm từ tiếng Anh, sau đó nhấp chuột phải.', status: 'empty', x, y });
       return;
     }
-    setDictionary({ word: selectedText, translation: 'Đang tra nghĩa…', status: 'loading', x, y });
+    const safeX = Math.min(Math.max(12, x), window.innerWidth - 300);
+    const safeY = Math.min(Math.max(12, y), window.innerHeight - 190);
+    setDictionary({ word: selectedText, translation: 'Đang tra nghĩa…', status: 'loading', x: safeX, y: safeY });
     try {
       const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(selectedText)}&langpair=en|vi`);
       if (!response.ok) throw new Error('Translation failed');
       const data = await response.json() as { responseData?: { translatedText?: string } };
       const translation = data.responseData?.translatedText?.trim();
       if (!translation) throw new Error('No translation');
-      setDictionary({ word: selectedText, translation, status: 'ready', x, y });
+      setDictionary({ word: selectedText, translation, status: 'ready', x: safeX, y: safeY });
     } catch {
-      setDictionary({ word: selectedText, translation: 'Chưa tra được nghĩa. Hãy kiểm tra kết nối mạng và thử lại.', status: 'error', x, y });
+      setDictionary({ word: selectedText, translation: 'Chưa tra được nghĩa. Hãy kiểm tra kết nối mạng và thử lại.', status: 'error', x: safeX, y: safeY });
     }
+  }, []);
+
+  const openDictionary = (event: ReactMouseEvent<HTMLElement>) => {
+    if (mode !== 'practice') return;
+    event.preventDefault();
+    const selectedText = window.getSelection()?.toString().trim().replace(/\s+/g, ' ') ?? '';
+    void lookupDictionary(selectedText, event.clientX, event.clientY);
+  };
+
+  const openDictionaryFromSelection = () => {
+    if (mode !== 'practice') return;
+    window.setTimeout(() => {
+      const selection = window.getSelection();
+      const selectedText = selection?.toString().trim().replace(/\s+/g, ' ') ?? '';
+      if (!selection || !selectedText || selection.rangeCount === 0) return;
+      const rect = selection.getRangeAt(0).getBoundingClientRect();
+      void lookupDictionary(selectedText, rect.left, rect.bottom + 10);
+    }, 30);
   };
 
   useEffect(() => {
@@ -945,16 +999,17 @@ export default function Home() {
   }, [availableExams.length, chooseAnswer, grade, mode, question, selectExam]);
 
   const resetExam = () => selectExam(examIndex);
-  const toggleFlag = () => {
-    const key = questionKey(question);
-    if (currentFlagged) {
+  const toggleFlag = (targetQuestion: Question = question) => {
+    const key = questionKey(targetQuestion);
+    const isFlagged = flagVault.some((item) => item.key === key);
+    if (isFlagged) {
       setFlagVault((items) => items.filter((item) => item.key !== key));
-      setFlagged((items) => items.filter((id) => id !== question.id));
+      setFlagged((items) => items.filter((id) => id !== targetQuestion.id));
       return;
     }
-    const entry: FlagEntry = { key, grade, examId: exam.id, examTitle: exam.title, prompt: question.prompt, section: question.section, savedAt: Date.now() };
+    const entry: FlagEntry = { key, grade, examId: exam.id, examTitle: exam.title, prompt: targetQuestion.prompt, section: targetQuestion.section, savedAt: Date.now() };
     setFlagVault((items) => [entry, ...items.filter((item) => item.key !== key)].slice(0, 120));
-    setFlagged((items) => items.includes(question.id) ? items : [...items, question.id]);
+    setFlagged((items) => items.includes(targetQuestion.id) ? items : [...items, targetQuestion.id]);
     setDailyStats((current) => ({ ...current, flags: current.flags + 1 }));
     setDuckCoins((current) => current + 2);
   };
@@ -1062,7 +1117,7 @@ export default function Home() {
       <div className="relative mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[210px_minmax(0,1fr)_250px]">
         <aside className="hidden self-start rounded-3xl border border-sky-100 bg-white p-4 shadow-sm lg:block">{examMenu}</aside>
 
-        <section className="min-w-0" onContextMenu={openDictionary}>
+        <section className="min-w-0" onContextMenu={openDictionary} onMouseUp={openDictionaryFromSelection}>
           <div className="mb-5 overflow-hidden rounded-[28px] border border-indigo-100 bg-gradient-to-r from-indigo-950 via-sky-900 to-cyan-800 text-white shadow-[0_18px_45px_rgba(30,64,175,.18)]">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/15 px-5 py-4">
               <div><p className="text-xs font-black uppercase tracking-[.2em] text-cyan-200">Adventure Hub</p><strong className="text-xl">Hành trình English {grade}</strong></div>
@@ -1079,11 +1134,11 @@ export default function Home() {
           </div>
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div><p className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-sky-700"><BookOpen className="size-4"/> English {grade} · {question.section}</p><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{exam.title}</h1></div>
-            <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">Câu {questionIndex + 1} / {questions.length}</span>
+            <span className="rounded-full bg-white px-3 py-2 text-sm font-semibold shadow-sm">{mode === 'survival' ? `Câu ${questionIndex + 1} / ${questions.length}` : `Trang ${currentPageIndex + 1} / ${questionPages.length}`}</span>
           </div>
           <div className="mb-3 grid gap-2 text-sm sm:grid-cols-3">
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-950"><strong>Luyện tập:</strong> sai lần 1 xem gợi ý; lần 2 khóa 10 giây; từ lần 3 khóa 20 giây. Mỗi lần sai mất một máu và chỉ tủ cấp cứu mới xóa được vết thương. Bôi đen tiếng Anh rồi nhấp chuột phải để dịch.</div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700"><strong>Làm bài test:</strong> mỗi lần một câu; 40 câu trong 60 phút. Làm đủ và nộp bài mới xem đáp án, lời giải.</div>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-950"><strong>Luyện tập:</strong> 10 câu mỗi trang, câu nào cũng có Hint. Sai lần 1 xem gợi ý; lần 2 khóa 10 giây; từ lần 3 khóa 20 giây. Bôi đen tiếng Anh để tự bật nghĩa.</div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700"><strong>Làm bài test:</strong> 10 câu mỗi trang; 40 câu trong 60 phút. Làm đủ và nộp bài mới xem đáp án, lời giải.</div>
             <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950"><strong>Survival:</strong> có 2 phút và 5 máu. Đúng 10 câu để qua màn, nâng phương tiện và cộng thêm 1 phút. Màn Boss chỉ có 3 máu.</div>
           </div>
           <div className="mb-5 grid grid-cols-3 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-sm">
@@ -1131,25 +1186,31 @@ export default function Home() {
               </div>
             </article>
           ) : (
-            <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_16px_50px_rgba(24,95,140,.08)] sm:p-8">
-              <div className="mb-5 flex items-center justify-between gap-3"><span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">{question.skillArea ?? (question.section === 'Reading' ? `Bài đọc · ${exam.passageTitle}` : question.section === 'Writing' ? 'Writing' : 'Ngữ âm · Từ vựng · Ngữ pháp')}</span><button onClick={toggleFlag} className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${currentFlagged ? 'bg-amber-100 text-amber-800' : 'text-slate-500 hover:bg-slate-50'}`}><Flag className="size-4" fill={currentFlagged ? 'currentColor' : 'none'}/> {currentFlagged ? 'Đã cắm cờ' : 'Cắm cờ'}</button></div>
-              {question.section === 'Reading' && (question.passage ?? exam.passage) && <div className="mb-6 max-h-72 overflow-y-auto rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-[15px] leading-7 text-slate-700"><strong className="mb-2 block text-amber-900">{question.passageTitle ?? exam.passageTitle}</strong>{question.passage ?? exam.passage}</div>}
-              <ExerciseQuestion
-                question={displayQuestion}
-                questionNumber={questionIndex + 1}
-                value={selected}
-                disabled={lockedQuestion === question.id || (mode === 'practice' && answers[question.id] !== undefined) || (mode === 'survival' && (bossPenalty?.kind === 'keyboard' || bossPenalty?.kind === 'screen-lock'))}
-                practiceCorrect={mode === 'practice' && isQuestionCorrect(question, answers[question.id])}
-                showCheck={mode === 'practice' || mode === 'survival'}
-                progressiveHint={mode === 'practice' && isTypedVocabulary ? vocabHintText : undefined}
-                hintMeaning={mode === 'practice' && isTypedVocabulary ? vocabHintMeaning : undefined}
-                onRevealHint={mode === 'practice' && isTypedVocabulary ? () => setVocabHintSteps((current) => ({ ...current, [questionKey(question)]: Math.min(vocabHintAnswer.length, vocabHintStep + 1) })) : undefined}
-                onChange={chooseAnswer}
-                onCheck={checkTypedAnswer}
-              />
-              {mode === 'practice' && answers[question.id] !== undefined && <div aria-live="polite" className="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-900"><div className="bg-emerald-100 px-4 py-2 text-sm font-bold uppercase tracking-wide">Hướng dẫn giải chi tiết</div><div className="p-4"><strong>Chính xác! Đáp án: {correctAnswer(question)}</strong><p className="mt-2 text-[15px] leading-7">{question.explanation}</p></div></div>}
-              {mode !== 'survival' ? <div className="mt-6 flex items-center justify-between gap-3"><Button variant="outline" disabled={questionIndex === 0} onClick={() => setQuestionIndex((value) => value - 1)} className="rounded-xl"><ChevronLeft/> Câu trước</Button>{questionIndex === questions.length - 1 ? <Button disabled={!canSubmit} onClick={submitExam} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">{mode === 'test' ? 'Nộp bài' : 'Xem tổng kết'}</Button> : <Button onClick={() => setQuestionIndex((value) => value + 1)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">Câu tiếp <ChevronRight/></Button>}</div> : <p className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-center text-sm font-bold text-amber-900">Chọn hoặc nhập đáp án — Survival sẽ tự chuyển sang câu kế tiếp.</p>}
-            </article>
+            <div className="space-y-5">
+              {visibleQuestionIndexes.map((itemIndex, visibleIndex) => {
+                const item = questions[itemIndex];
+                const itemKey = questionKey(item);
+                const itemFlagged = flagVault.some((saved) => saved.key === itemKey);
+                const itemSelected = drafts[item.id] ?? answers[item.id];
+                const itemIsTypedVocabulary = isTypedVocabularyQuestion(item);
+                const itemHintAnswer = itemIsTypedVocabulary ? String(Array.isArray(item.answer) ? item.answer[0] ?? '' : item.answer) : '';
+                const itemHintStep = vocabHintSteps[itemKey] ?? Math.min(2, itemHintAnswer.length);
+                const itemHintText = itemHintAnswer ? [...itemHintAnswer].map((character, index) => /[a-z]/i.test(character) ? index < itemHintStep ? character : '_' : character).join(' ') : '';
+                const itemHintMeaning = vocabularyPool.find((entry) => entry.word.toLocaleLowerCase() === itemHintAnswer.trim().toLocaleLowerCase())?.meaning;
+                const previousItem = visibleIndex > 0 ? questions[visibleQuestionIndexes[visibleIndex - 1]] : undefined;
+                const showReadingPassage = item.section === 'Reading' && (!previousItem || previousItem.section !== 'Reading' || previousItem.passage !== item.passage || previousItem.passageTitle !== item.passageTitle);
+                const renderedQuestion = mode === 'survival' ? displayQuestion : item;
+                return <article key={item.id} className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_16px_50px_rgba(24,95,140,.08)] sm:p-8">
+                  <div className="mb-5 flex items-center justify-between gap-3"><span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">{item.skillArea ?? (item.section === 'Reading' ? `Bài đọc · ${item.passageTitle ?? exam.passageTitle}` : item.section === 'Writing' ? 'Writing' : 'Ngữ âm · Từ vựng · Ngữ pháp')}</span><button onClick={() => toggleFlag(item)} className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${itemFlagged ? 'bg-amber-100 text-amber-800' : 'text-slate-500 hover:bg-slate-50'}`}><Flag className="size-4" fill={itemFlagged ? 'currentColor' : 'none'}/> {itemFlagged ? 'Đã cắm cờ' : 'Cắm cờ'}</button></div>
+                  {showReadingPassage && (item.passage ?? exam.passage) && <div className="mb-6 rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-[15px] leading-7 text-slate-700"><strong className="mb-2 block text-amber-900">{item.passageTitle ?? exam.passageTitle}</strong>{item.passage ?? exam.passage}</div>}
+                  <ExerciseQuestion question={renderedQuestion} questionNumber={itemIndex + 1} value={itemSelected} disabled={lockedQuestion === item.id || (mode === 'practice' && answers[item.id] !== undefined) || (mode === 'survival' && (bossPenalty?.kind === 'keyboard' || bossPenalty?.kind === 'screen-lock'))} practiceCorrect={mode === 'practice' && isQuestionCorrect(item, answers[item.id])} showCheck={mode === 'practice' || mode === 'survival'} progressiveHint={mode === 'practice' && itemIsTypedVocabulary ? itemHintText : undefined} hintMeaning={mode === 'practice' && itemIsTypedVocabulary ? itemHintMeaning : undefined} onRevealHint={mode === 'practice' && itemIsTypedVocabulary ? () => setVocabHintSteps((current) => ({ ...current, [itemKey]: Math.min(itemHintAnswer.length, itemHintStep + 1) })) : undefined} onChange={(value) => chooseAnswer(value, itemIndex)} onCheck={() => checkTypedAnswer(itemIndex)}/>
+                  {mode === 'practice' && <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 p-3"><button type="button" onClick={() => setVisibleHints((current) => ({ ...current, [itemKey]: !current[itemKey] }))} className="font-bold text-violet-800">💡 {visibleHints[itemKey] ? 'Ẩn Hint' : 'Xem Hint'}</button>{visibleHints[itemKey] && <p className="mt-2 leading-6 text-violet-950">{practiceHint(item)}</p>}</div>}
+                  {mode === 'practice' && answers[item.id] !== undefined && <div aria-live="polite" className="mt-5 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-900"><div className="bg-emerald-100 px-4 py-2 text-sm font-bold uppercase tracking-wide">Hướng dẫn giải chi tiết</div><div className="p-4"><strong>Chính xác! Đáp án: {correctAnswer(item)}</strong><p className="mt-2 text-[15px] leading-7">{item.explanation}</p></div></div>}
+                  {mode === 'survival' && <p className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-center text-sm font-bold text-amber-900">Chọn đáp án — Survival sẽ tự chuyển sang câu kế tiếp.</p>}
+                </article>;
+              })}
+              {mode !== 'survival' && <nav className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-100 bg-white p-4 shadow-sm" aria-label="Phân trang câu hỏi"><Button variant="outline" disabled={currentPageIndex === 0} onClick={() => setQuestionIndex(questionPages[currentPageIndex - 1]?.[0] ?? 0)} className="rounded-xl"><ChevronLeft/> 10 câu trước</Button><strong className="text-sm text-slate-600">Câu {(visibleQuestionIndexes[0] ?? 0) + 1}–{(visibleQuestionIndexes.at(-1) ?? 0) + 1} / {questions.length}</strong>{currentPageIndex === questionPages.length - 1 ? <Button disabled={!canSubmit} onClick={submitExam} className="rounded-xl bg-[#123c5a] px-5 hover:bg-[#0e3048]">{mode === 'test' ? 'Nộp bài' : 'Xem tổng kết'}</Button> : <Button onClick={() => setQuestionIndex(questionPages[currentPageIndex + 1]?.[0] ?? questionIndex)} className="rounded-xl bg-sky-600 px-5 hover:bg-sky-700">10 câu tiếp <ChevronRight/></Button>}</nav>}
+            </div>
           )}
         </section>
 

@@ -39,8 +39,12 @@ export function distributeAnswers(questions: Question[], seed: string): Question
 }
 
 export function distributeExams(exams: Exam[]): Exam[] {
-  return exams.map((exam) => ({
-    ...exam,
-    questions: distributeAnswers(exam.questions, `${exam.title}|${exam.id}`),
-  }));
+  return exams.map((exam) => {
+    const randomized = distributeAnswers(exam.questions.filter((question) => question.section !== 'Reading'), `${exam.title}|${exam.id}`);
+    const randomizedById = new Map(randomized.map((question) => [question.id, question]));
+    return {
+      ...exam,
+      questions: exam.questions.map((question) => question.section === 'Reading' ? question : randomizedById.get(question.id) ?? question),
+    };
+  });
 }
